@@ -1,11 +1,13 @@
+import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import RouteLogScreen from './src/screens/RouteLogScreen';
+import React from 'react';
+import { AppNavigator } from './src/navigation/AppNavigator';
 
 export default function App() {
   return (
-    <>
+    <NavigationContainer>
       <StatusBar style="dark" />
-      <RouteLogScreen />
-    </>
+      <AppNavigator />
+    </NavigationContainer>
   );
 }
