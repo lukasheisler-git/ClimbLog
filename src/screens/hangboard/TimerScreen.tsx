@@ -10,10 +10,11 @@ import { initBeeps, unloadBeeps } from '../../utils/audioUtils';
 
 type Props = NativeStackScreenProps<HangboardStackParamList, 'Timer'>;
 
-const GREEN      = '#1B4332';
-const GREEN_LIGHT= '#52B788';
-const RED        = '#D62828';
-const AMBER      = '#F59E0B';
+const GREEN       = '#1B4332';
+const GREEN_LIGHT = '#52B788';
+const HANG_GREEN  = '#16A34A';
+const RED         = '#D62828';
+const AMBER       = '#F59E0B';
 
 const PHASE_LABEL: Record<string, string> = {
   idle:     'Bereit',
@@ -117,7 +118,7 @@ export function TimerScreen({ route, navigation }: Props) {
 
   const currentSet = timer.currentSet;
   const isHanging  = timer.phase === 'hanging';
-  const phaseColor = isHanging ? RED : timer.phase === 'getReady' ? AMBER : GREEN;
+  const phaseColor = isHanging ? HANG_GREEN : timer.phase === 'getReady' ? AMBER : RED;
 
   // ── Timer-Screen ──────────────────────────────────────────────────────────
   return (

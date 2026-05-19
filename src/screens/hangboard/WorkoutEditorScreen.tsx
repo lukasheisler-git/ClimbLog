@@ -19,7 +19,6 @@ const CARD  = '#FFFFFF';
 
 function makeSet(base?: Partial<HangboardSet>): HangboardSet {
   return {
-    id:           `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     gripDepth:    '20mm',
     gripType:     'Half Crimp',
     hangDuration: 7,
@@ -28,6 +27,8 @@ function makeSet(base?: Partial<HangboardSet>): HangboardSet {
     setRest:      180,
     addedWeight:  0,
     ...base,
+    // id immer neu generieren — base kann die ID des Quell-Satzes mitbringen
+    id: `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
   };
 }
 
