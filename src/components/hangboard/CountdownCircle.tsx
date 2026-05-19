@@ -15,10 +15,11 @@ const STROKE = 14;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 const PHASE_COLOR: Record<TimerPhase, string> = {
+  idle:     '#9CA3AF',
+  getReady: '#F59E0B',
   hanging:  '#D62828',
   repRest:  '#2D6A4F',
   setRest:  '#1A535C',
-  idle:     '#9CA3AF',
   complete: '#52B788',
 };
 

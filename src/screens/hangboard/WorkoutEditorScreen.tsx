@@ -11,7 +11,7 @@ import { GripDepth, GripType, HangboardSet, HangboardWorkout } from '../../types
 type Props = NativeStackScreenProps<HangboardStackParamList, 'WorkoutEditor'>;
 
 const GRIP_DEPTHS: GripDepth[] = ['45mm', '30mm', '20mm', '15mm'];
-const GRIP_TYPES: GripType[]   = ['Half Crimp', 'Full Crimp', 'Open Hand', 'Pinch'];
+const GRIP_TYPES: GripType[]   = ['Half Crimp', 'Full Crimp', 'Open Hand'];
 
 const GREEN = '#1B4332';
 const BG    = '#F3F4F6';

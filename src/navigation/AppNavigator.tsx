@@ -16,6 +16,7 @@ const GREEN = '#1B4332';
 export function AppNavigator() {
   return (
     <Tab.Navigator
+      id="TabNavigator"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor:   GREEN,

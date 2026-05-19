@@ -9,7 +9,7 @@ const Stack = createNativeStackNavigator<HangboardStackParamList>();
 
 export function HangboardNavigator() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator id="HangboardStack" screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HangboardHome"  component={HangboardHomeScreen} />
       <Stack.Screen name="WorkoutEditor"  component={WorkoutEditorScreen} />
       <Stack.Screen

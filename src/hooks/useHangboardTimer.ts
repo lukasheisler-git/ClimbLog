@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { HangboardWorkout } from '../types/hangboard';
 import { playLongBeep, playShortBeep } from '../utils/audioUtils';
 
-export type TimerPhase = 'idle' | 'hanging' | 'repRest' | 'setRest' | 'complete';
+export type TimerPhase = 'idle' | 'getReady' | 'hanging' | 'repRest' | 'setRest' | 'complete';
 
 interface InternalState {
   phase: TimerPhase;
@@ -26,10 +26,17 @@ const IDLE: InternalState = {
   elapsedSeconds: 0,
 };
 
+const GET_READY_SECONDS = 15;
+
 // Reine Übergangsfunktion — bestimmt den nächsten Zustand wenn ein Countdown
 // auf 0 fällt. Wird im interval-Callback aufgerufen (kein React-State-Zugriff).
 function advance(s: InternalState, workout: HangboardWorkout): InternalState {
   const set = workout.sets[s.setIndex];
+
+  if (s.phase === 'getReady') {
+    const firstSet = workout.sets[0];
+    return { ...s, phase: 'hanging', setIndex: 0, rep: 1, secondsLeft: firstSet.hangDuration, totalForPhase: firstSet.hangDuration };
+  }
 
   if (s.phase === 'hanging') {
     const newCompleted = [...s.completedRepsPerSet];
@@ -94,8 +101,8 @@ export function useHangboardTimer(workout: HangboardWorkout | null) {
     // Ton-Feedback beim Phasenwechsel
     if (next.phase === 'repRest' || next.phase === 'setRest') {
       playShortBeep(); // Hang beendet
-    } else if (next.phase === 'hanging' && (prevPhase === 'repRest' || prevPhase === 'setRest')) {
-      playLongBeep();  // Pause beendet → jetzt hängen
+    } else if (next.phase === 'hanging' && (prevPhase === 'repRest' || prevPhase === 'setRest' || prevPhase === 'getReady')) {
+      playLongBeep();  // Pause / Get-Ready beendet → jetzt hängen
     } else if (next.phase === 'complete') {
       playLongBeep();
       stopTick();
@@ -112,12 +119,11 @@ export function useHangboardTimer(workout: HangboardWorkout | null) {
   const start = useCallback(() => {
     const w = workoutRef.current;
     if (!w || w.sets.length === 0) return;
-    const firstSet = w.sets[0];
     stateRef.current = {
       ...IDLE,
-      phase: 'hanging',
-      secondsLeft: firstSet.hangDuration,
-      totalForPhase: firstSet.hangDuration,
+      phase: 'getReady',
+      secondsLeft: GET_READY_SECONDS,
+      totalForPhase: GET_READY_SECONDS,
       completedRepsPerSet: w.sets.map(() => 0),
     };
     sync();

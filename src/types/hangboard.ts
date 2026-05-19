@@ -1,5 +1,5 @@
 export type GripDepth = '45mm' | '30mm' | '20mm' | '15mm';
-export type GripType = 'Half Crimp' | 'Full Crimp' | 'Open Hand' | 'Pinch';
+export type GripType = 'Half Crimp' | 'Full Crimp' | 'Open Hand';
 
 export interface HangboardSet {
   id: string;

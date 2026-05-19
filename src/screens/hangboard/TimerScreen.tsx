@@ -13,9 +13,11 @@ type Props = NativeStackScreenProps<HangboardStackParamList, 'Timer'>;
 const GREEN      = '#1B4332';
 const GREEN_LIGHT= '#52B788';
 const RED        = '#D62828';
+const AMBER      = '#F59E0B';
 
 const PHASE_LABEL: Record<string, string> = {
   idle:     'Bereit',
+  getReady: 'GET READY',
   hanging:  'HÄNGEN',
   repRest:  'REP-PAUSE',
   setRest:  'SATZPAUSE',
@@ -74,7 +76,8 @@ export function TimerScreen({ route, navigation }: Props) {
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', e => {
       if (timer.phase === 'idle' || timer.phase === 'complete') return;
-      e.preventDefault();
+      // React Navigation v7: cast nötig da der Typ fälschlicherweise als non-cancelable deklariert ist
+      (e as any).preventDefault();
       Alert.alert('Workout abbrechen?', 'Der aktuelle Fortschritt geht verloren.', [
         { text: 'Weiter trainieren', style: 'cancel' },
         { text: 'Abbrechen', style: 'destructive', onPress: () => { timer.abort(); navigation.dispatch(e.data.action); } },
@@ -114,7 +117,7 @@ export function TimerScreen({ route, navigation }: Props) {
 
   const currentSet = timer.currentSet;
   const isHanging  = timer.phase === 'hanging';
-  const phaseColor = isHanging ? RED : GREEN;
+  const phaseColor = isHanging ? RED : timer.phase === 'getReady' ? AMBER : GREEN;
 
   // ── Timer-Screen ──────────────────────────────────────────────────────────
   return (
