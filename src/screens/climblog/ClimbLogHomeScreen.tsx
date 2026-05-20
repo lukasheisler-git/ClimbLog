@@ -29,7 +29,7 @@ export function ClimbLogHomeScreen({ navigation }: Props) {
     <View style={styles.root}>
       <View style={styles.header}>
         <Text style={styles.title}>Kletterlog</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('AddRoute')} hitSlop={8}>
+        <TouchableOpacity onPress={() => navigation.navigate('AddRoute', {})} hitSlop={8}>
           <Ionicons name="add-circle-outline" size={28} color="#1B4332" />
         </TouchableOpacity>
       </View>
@@ -46,13 +46,17 @@ export function ClimbLogHomeScreen({ navigation }: Props) {
         data={routes}
         keyExtractor={r => r.id}
         renderItem={({ item }) => (
-          <RouteCard route={item} onDelete={() => handleDelete(item.id)} />
+          <RouteCard
+            route={item}
+            onEdit={() => navigation.navigate('AddRoute', { routeId: item.id })}
+            onDelete={() => handleDelete(item.id)}
+          />
         )}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <View style={styles.emptyBox}>
             <Text style={styles.emptyText}>Noch keine Begehungen erfasst.</Text>
-            <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('AddRoute')}>
+            <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('AddRoute', {})}>
               <Text style={styles.emptyBtnText}>Erste Route hinzufügen</Text>
             </TouchableOpacity>
           </View>

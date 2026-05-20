@@ -1,12 +1,12 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { ClimbLogStackParamList } from '../../navigation/types';
-import { saveRoute } from '../../storage/climblogStorage';
+import { loadRoutes, saveRoute, updateRoute } from '../../storage/climblogStorage';
 import { ClimbResult, ClimbRoute, ClimbStyle, GRADES } from '../../types/climblog';
 
 type Props = NativeStackScreenProps<ClimbLogStackParamList, 'AddRoute'>;
@@ -53,29 +53,67 @@ function StarRow({ value, onChange }: { value: number; onChange: (n: number) => 
   );
 }
 
-export function AddRouteScreen({ navigation }: Props) {
-  const [name,   setName]   = useState('');
-  const [area,   setArea]   = useState('');
-  const [sector, setSector] = useState('');
-  const [date,   setDate]   = useState(new Date());
-  const [showDP, setShowDP] = useState(false);
-  const [grade,  setGrade]  = useState('7a');
-  const [style,  setStyle]  = useState<ClimbStyle>('Lead');
-  const [result, setResult] = useState<ClimbResult>('Redpoint');
-  const [stars,  setStars]  = useState(0);
-  const [notes,  setNotes]  = useState('');
-  const [error,  setError]  = useState('');
+export function AddRouteScreen({ route, navigation }: Props) {
+  const routeId  = route.params?.routeId;
+  const isEditing = !!routeId;
 
-  const gradeScrollRef = useRef<ScrollView>(null);
+  const [name,     setName]     = useState('');
+  const [area,     setArea]     = useState('');
+  const [sector,   setSector]   = useState('');
+  const [date,     setDate]     = useState(new Date());
+  const [showDP,   setShowDP]   = useState(false);
+  const [grade,    setGrade]    = useState('7a');
+  const [style,    setStyle]    = useState<ClimbStyle>('Lead');
+  const [result,   setResult]   = useState<ClimbResult>('Redpoint');
+  const [stars,    setStars]    = useState(0);
+  const [notes,    setNotes]    = useState('');
+  const [error,    setError]    = useState('');
+  const [isLoaded, setIsLoaded] = useState(!isEditing);
+
+  const gradeScrollRef  = useRef<ScrollView>(null);
+  const existingIdRef   = useRef<string | null>(null);
+  const existingAtRef   = useRef<number>(Date.now());
+
+  // Bestehendes Workout laden wenn routeId vorhanden
+  useEffect(() => {
+    if (!routeId) return;
+    loadRoutes().then(routes => {
+      const found = routes.find(r => r.id === routeId);
+      if (!found) return;
+      existingIdRef.current  = found.id;
+      existingAtRef.current  = found.createdAt;
+      setName(found.name);
+      setArea(found.area ?? '');
+      setSector(found.sector ?? '');
+      setDate(new Date(found.date));
+      setGrade(found.grade);
+      setStyle(found.style);
+      setResult(found.result);
+      setStars(found.stars ?? 0);
+      setNotes(found.notes ?? '');
+      setIsLoaded(true);
+    });
+  }, [routeId]);
+
+  // Grad-Picker nach dem Laden zur gewählten Note scrollen
+  useEffect(() => {
+    if (!isLoaded) return;
+    const idx = (GRADES as readonly string[]).indexOf(grade);
+    if (idx < 0) return;
+    // Chip-Breite ~48px; Sichtfenster-Hälfte ~150px
+    const x = Math.max(0, idx * 48 - 150);
+    const t = setTimeout(() => gradeScrollRef.current?.scrollTo({ x, animated: false }), 80);
+    return () => clearTimeout(t);
+  }, [isLoaded]); // läuft einmalig wenn Daten bereit sind
 
   const handleSave = async () => {
     if (!name.trim()) { setError('Bitte einen Routennamen eingeben.'); return; }
     setError('');
 
-    const route: ClimbRoute = {
-      id:        `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    const entry: ClimbRoute = {
+      id:        existingIdRef.current ?? `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
       name:      name.trim(),
-      area:      area.trim() || undefined,
+      area:      area.trim()   || undefined,
       sector:    sector.trim() || undefined,
       date:      date.toISOString(),
       grade,
@@ -83,10 +121,14 @@ export function AddRouteScreen({ navigation }: Props) {
       result,
       stars:     stars || undefined,
       notes:     notes.trim() || undefined,
-      createdAt: Date.now(),
+      createdAt: existingAtRef.current,
     };
 
-    await saveRoute(route);
+    if (isEditing) {
+      await updateRoute(entry);
+    } else {
+      await saveRoute(entry);
+    }
     navigation.goBack();
   };
 
@@ -98,7 +140,7 @@ export function AddRouteScreen({ navigation }: Props) {
           <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
             <Text style={styles.backBtn}>← Zurück</Text>
           </TouchableOpacity>
-          <Text style={styles.heading}>Begehung erfassen</Text>
+          <Text style={styles.heading}>{isEditing ? 'Begehung bearbeiten' : 'Begehung erfassen'}</Text>
         </View>
 
         {/* Routenname */}
@@ -220,7 +262,7 @@ const styles = StyleSheet.create({
   container: { padding: 20, paddingBottom: 48 },
 
   header:    { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 32, marginBottom: 24 },
-  backBtn:   { fontSize: 14, color: '#1B4332', fontWeight: '600' },
+  backBtn:   { fontSize: 14, color: GREEN, fontWeight: '600' },
   heading:   { fontSize: 22, fontWeight: '700', color: '#111827' },
 
   fieldLabel: { fontSize: 12, fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 8, marginTop: 16 },
@@ -235,22 +277,22 @@ const styles = StyleSheet.create({
   dateBtn:     { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1.5, borderColor: '#E5E7EB', paddingHorizontal: 14, paddingVertical: 12 },
   dateBtnText: { fontSize: 15, color: '#111827' },
 
-  gradeScroll:  { marginHorizontal: -2 },
-  gradeContent: { flexDirection: 'row', gap: 6, paddingHorizontal: 2 },
+  gradeScroll:     { marginHorizontal: -2 },
+  gradeContent:    { flexDirection: 'row', gap: 6, paddingHorizontal: 2 },
   gradeChip:       { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#fff' },
-  gradeChipActive: { backgroundColor: '#1B4332', borderColor: '#1B4332' },
+  gradeChipActive: { backgroundColor: GREEN, borderColor: GREEN },
   gradeText:       { fontSize: 13, fontWeight: '600', color: '#6B7280' },
   gradeTextActive: { color: '#fff' },
 
-  toggleRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  toggleBtn:       { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 8, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#fff' },
-  toggleBtnActive: { backgroundColor: '#1B4332', borderColor: '#1B4332' },
-  toggleText:      { fontSize: 13, fontWeight: '600', color: '#6B7280' },
-  toggleTextActive:{ color: '#fff' },
+  toggleRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  toggleBtn:        { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 8, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#fff' },
+  toggleBtnActive:  { backgroundColor: GREEN, borderColor: GREEN },
+  toggleText:       { fontSize: 13, fontWeight: '600', color: '#6B7280' },
+  toggleTextActive: { color: '#fff' },
 
   starRow: { flexDirection: 'row', gap: 8 },
   star:    { fontSize: 30 },
 
-  saveBtn:     { marginTop: 32, backgroundColor: '#1B4332', borderRadius: 14, paddingVertical: 16, alignItems: 'center', elevation: 3 },
+  saveBtn:     { marginTop: 32, backgroundColor: GREEN, borderRadius: 14, paddingVertical: 16, alignItems: 'center', elevation: 3 },
   saveBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
 });

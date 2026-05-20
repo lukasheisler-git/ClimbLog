@@ -4,6 +4,7 @@ import { ClimbResult, ClimbRoute } from '../../types/climblog';
 
 interface Props {
   route: ClimbRoute;
+  onEdit?: () => void;
   onDelete?: () => void;
 }
 
@@ -18,19 +19,20 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-export function RouteCard({ route, onDelete }: Props) {
+export function RouteCard({ route, onEdit, onDelete }: Props) {
   const handleLongPress = () => {
-    if (!onDelete) return;
+    if (!onEdit && !onDelete) return;
     Alert.alert(route.name, undefined, [
-      { text: 'Löschen', style: 'destructive', onPress: onDelete },
-      { text: 'Abbrechen', style: 'cancel' },
+      ...(onEdit   ? [{ text: 'Bearbeiten', onPress: onEdit }] : []),
+      ...(onDelete ? [{ text: 'Löschen', style: 'destructive' as const, onPress: onDelete }] : []),
+      { text: 'Abbrechen', style: 'cancel' as const },
     ]);
   };
 
   return (
     <TouchableOpacity
       style={styles.card}
-      onLongPress={onDelete ? handleLongPress : undefined}
+      onLongPress={handleLongPress}
       activeOpacity={0.85}
     >
       <View style={styles.top}>

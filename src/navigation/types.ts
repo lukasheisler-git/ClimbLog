@@ -8,7 +8,7 @@ export type HangboardStackParamList = {
 
 export type ClimbLogStackParamList = {
   ClimbLogHome:   undefined;
-  AddRoute:       undefined;
+  AddRoute:       { routeId?: string };
   ClimbLogSearch: undefined;
   ClimbLogStats:  undefined;
 };
