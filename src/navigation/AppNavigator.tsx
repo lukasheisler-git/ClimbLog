@@ -2,7 +2,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Text } from 'react-native';
-import RouteLogScreen from '../screens/RouteLogScreen';
+import { ClimbLogNavigator } from './ClimbLogNavigator';
 import { HangboardNavigator } from './HangboardNavigator';
 import { AppTabParamList } from './types';
 
@@ -35,7 +35,7 @@ export function AppNavigator() {
       })}
     >
       <Tab.Screen name="HomeTab"      component={HomeScreen}        options={{ tabBarLabel: 'Home' }} />
-      <Tab.Screen name="ClimbLogTab"  component={RouteLogScreen}    options={{ tabBarLabel: 'Kletterlog' }} />
+      <Tab.Screen name="ClimbLogTab"  component={ClimbLogNavigator} options={{ tabBarLabel: 'Kletterlog' }} />
       <Tab.Screen name="HangboardTab" component={HangboardNavigator} options={{ tabBarLabel: 'Hangboard' }} />
       <Tab.Screen name="TrainingTab"  component={TrainingScreen}    options={{ tabBarLabel: 'Training' }} />
     </Tab.Navigator>
