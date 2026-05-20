@@ -2,14 +2,13 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Text } from 'react-native';
+import { HomeScreen } from '../screens/home/HomeScreen';
 import { ClimbLogNavigator } from './ClimbLogNavigator';
 import { HangboardNavigator } from './HangboardNavigator';
 import { AppTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
 
-// Platzhalter-Screens für spätere Module
-function HomeScreen()     { return <Text style={{ margin: 40, fontSize: 16, color: '#6B7280' }}>Home — kommt bald</Text>; }
 function TrainingScreen() { return <Text style={{ margin: 40, fontSize: 16, color: '#6B7280' }}>Training — kommt bald</Text>; }
 
 const ICON_MAP: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
