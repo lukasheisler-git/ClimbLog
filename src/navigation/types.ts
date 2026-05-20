@@ -6,11 +6,11 @@ export type HangboardStackParamList = {
   Timer:         { workoutId: string };
 };
 
+export type ClimbLogTabKey = 'Begehungen' | 'Suche' | 'Statistik';
+
 export type ClimbLogStackParamList = {
-  ClimbLogHome:   undefined;
-  AddRoute:       { routeId?: string };
-  ClimbLogSearch: undefined;
-  ClimbLogStats:  undefined;
+  ClimbLogMain: { initialTab?: ClimbLogTabKey };
+  AddRoute:     { routeId?: string };
 };
 
 export type TrainingStackParamList = {

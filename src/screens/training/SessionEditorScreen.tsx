@@ -54,7 +54,7 @@ export function SessionEditorScreen({ route, navigation }: Props) {
         if (s) { originalId.current = s.id; fill(s); }
       } else if (templateId) {
         const t = all.find(x => x.id === templateId);
-        if (t) { fill(t); }
+        if (t) { fill(t); setDate(new Date()); } // always use today for new sessions from template
       }
     }
     load();
@@ -168,6 +168,7 @@ export function SessionEditorScreen({ route, navigation }: Props) {
             value={date}
             mode="date"
             display="default"
+            maximumDate={new Date()}
             onChange={(_, d) => { setShowDatePicker(false); if (d) setDate(d); }}
           />
         )}

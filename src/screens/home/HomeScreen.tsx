@@ -47,7 +47,7 @@ export function HomeScreen({ navigation }: Props) {
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const navigateToProjects = () => {
-    navigation.navigate('ClimbLogTab', { screen: 'ClimbLogStats' } as any);
+    navigation.navigate('ClimbLogTab', { screen: 'ClimbLogMain', params: { initialTab: 'Statistik' } } as any);
   };
 
   return (

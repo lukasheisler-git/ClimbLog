@@ -1,7 +1,8 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { AppTabBar } from '../../components/shared/AppTabBar';
 import { TrainingStackParamList } from '../../navigation/types';
 import { initTemplates } from '../../storage/trainingStorage';
 import { useTraining } from '../../hooks/useTraining';
@@ -27,18 +28,7 @@ export function TrainingMainScreen({ navigation }: Props) {
         <Text style={styles.title}>Training</Text>
       </View>
 
-      {/* Top Tab Bar */}
-      <View style={styles.tabBar}>
-        {TABS.map(tab => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <AppTabBar tabs={TABS} active={activeTab} onPress={setActiveTab} />
 
       {/* Content */}
       {activeTab === 'Log' ? (
@@ -60,12 +50,4 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 52, paddingBottom: 12 },
   title:  { fontSize: 26, fontWeight: '700', color: '#111827' },
 
-  tabBar: {
-    flexDirection: 'row', marginHorizontal: 16, marginBottom: 12,
-    backgroundColor: '#E5E7EB', borderRadius: 10, padding: 3,
-  },
-  tab:         { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
-  tabActive:   { backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2, elevation: 2 },
-  tabText:     { fontSize: 14, fontWeight: '600', color: '#9CA3AF' },
-  tabTextActive:{ color: '#111827' },
 });
