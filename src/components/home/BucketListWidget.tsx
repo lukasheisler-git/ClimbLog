@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
   Alert, KeyboardAvoidingView, Modal, Platform,
-  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { deleteBucketItem, saveBucketItem, updateBucketItem } from '../../storage/homeStorage';
 import { BucketListItem, BucketListType } from '../../types/home';
@@ -21,15 +21,17 @@ const TYPE_COLOR: Record<BucketListType, string> = {
 };
 
 export function BucketListWidget({ items, onUpdate }: Props) {
-  const [addVisible,  setAddVisible]  = useState(false);
-  const [doneVisible, setDoneVisible] = useState(false);
-  const [doneItem,    setDoneItem]    = useState<BucketListItem | null>(null);
-  const [inputName,   setInputName]   = useState('');
-  const [inputNotes,  setInputNotes]  = useState('');
+  const [addVisible,   setAddVisible]   = useState(false);
+  const [doneVisible,  setDoneVisible]  = useState(false);
+  const [doneItem,     setDoneItem]     = useState<BucketListItem | null>(null);
+  const [inputName,    setInputName]    = useState('');
+  const [inputNotes,   setInputNotes]   = useState('');
   const [selectedType, setSelectedType] = useState<BucketListType>('Gebiet');
+  const [showAll,      setShowAll]      = useState(false);
 
-  const openItems  = items.filter(i => !i.done);
-  const doneItems  = items.filter(i => i.done);
+  const openItems = items.filter(i => !i.done);
+  const doneItems = items.filter(i => i.done);
+  const visibleItems = showAll ? items : openItems;
 
   const handleAdd = async () => {
     if (!inputName.trim()) return;
@@ -82,47 +84,42 @@ export function BucketListWidget({ items, onUpdate }: Props) {
         </TouchableOpacity>
       </View>
 
-      {openItems.length === 0 && doneItems.length === 0 ? (
+      {items.length === 0 ? (
         <Text style={styles.empty}>Noch keine Ziele. Füge dein erstes Ziel hinzu!</Text>
       ) : (
         <>
-          {openItems.map(item => (
+          {visibleItems.map(item => (
             <TouchableOpacity
               key={item.id}
-              style={styles.itemRow}
-              onPress={() => confirmDone(item)}
+              style={[styles.itemRow, item.done && styles.itemRowDone]}
+              onPress={() => !item.done && confirmDone(item)}
               onLongPress={() => handleLongPress(item)}
             >
-              <View style={[styles.typeDot, { backgroundColor: TYPE_COLOR[item.type] }]} />
+              <View style={[styles.typeDot, { backgroundColor: item.done ? '#D1D5DB' : TYPE_COLOR[item.type] }]} />
               <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>{item.name}</Text>
-                {item.notes && <Text style={styles.itemNotes} numberOfLines={1}>{item.notes}</Text>}
+                <Text style={[styles.itemName, item.done && styles.itemNameDone]}>{item.name}</Text>
+                {item.notes && !item.done && <Text style={styles.itemNotes} numberOfLines={1}>{item.notes}</Text>}
               </View>
-              <Text style={styles.itemType}>{item.type}</Text>
-              <Ionicons name="checkmark-circle-outline" size={22} color="#D1D5DB" />
+              {!item.done && <Text style={styles.itemType}>{item.type}</Text>}
+              <Ionicons
+                name={item.done ? 'checkmark-circle' : 'checkmark-circle-outline'}
+                size={22}
+                color={item.done ? '#1B4332' : '#D1D5DB'}
+              />
             </TouchableOpacity>
           ))}
 
           {doneItems.length > 0 && (
-            <>
-              <Text style={styles.doneLabel}>Erledigt ({doneItems.length})</Text>
-              {doneItems.slice(0, 3).map(item => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[styles.itemRow, styles.itemRowDone]}
-                  onLongPress={() => handleLongPress(item)}
-                >
-                  <View style={[styles.typeDot, { backgroundColor: '#D1D5DB' }]} />
-                  <View style={styles.itemInfo}>
-                    <Text style={[styles.itemName, styles.itemNameDone]}>{item.name}</Text>
-                  </View>
-                  <Ionicons name="checkmark-circle" size={22} color="#1B4332" />
-                </TouchableOpacity>
-              ))}
-              {doneItems.length > 3 && (
-                <Text style={styles.moreCount}>+{doneItems.length - 3} weitere erledigt</Text>
-              )}
-            </>
+            <TouchableOpacity style={styles.showAllBtn} onPress={() => setShowAll(v => !v)}>
+              <Text style={styles.showAllText}>
+                {showAll ? 'Weniger anzeigen' : `Alle anzeigen (${doneItems.length} erledigt)`}
+              </Text>
+              <Ionicons
+                name={showAll ? 'chevron-up-outline' : 'chevron-down-outline'}
+                size={14}
+                color="#6B7280"
+              />
+            </TouchableOpacity>
           )}
         </>
       )}
@@ -218,8 +215,8 @@ const styles = StyleSheet.create({
   itemNotes:    { fontSize: 12, color: '#9CA3AF', marginTop: 1 },
   itemType:     { fontSize: 11, color: '#9CA3AF', fontWeight: '500' },
 
-  doneLabel: { fontSize: 11, fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 12, marginBottom: 4 },
-  moreCount: { fontSize: 12, color: '#9CA3AF', textAlign: 'center', paddingTop: 8 },
+  showAllBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: 12 },
+  showAllText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
 
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
   modalSheet:   { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40 },

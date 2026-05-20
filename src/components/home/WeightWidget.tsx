@@ -44,18 +44,19 @@ export function WeightWidget({ entries, onUpdate }: Props) {
     onUpdate();
   };
 
-  const handleLongPress = (entry: WeightEntry) => {
+  const latestEntry = entries.length > 0 ? entries[0] : null;
+
+  const handleLongPressLatest = () => {
+    if (!latestEntry) return;
     Alert.alert(
       'Eintrag löschen',
-      `${entry.weight} kg vom ${formatDate(entry.date)} löschen?`,
+      `${latestEntry.weight} kg vom ${formatDate(latestEntry.date)} löschen?`,
       [
         { text: 'Abbrechen', style: 'cancel' },
-        { text: 'Löschen', style: 'destructive', onPress: async () => { await deleteWeightEntry(entry.id); onUpdate(); } },
+        { text: 'Löschen', style: 'destructive', onPress: async () => { await deleteWeightEntry(latestEntry.id); onUpdate(); } },
       ],
     );
   };
-
-  const latestWeight = entries.length > 0 ? entries[0].weight : null;
 
   return (
     <View style={styles.card}>
@@ -65,10 +66,6 @@ export function WeightWidget({ entries, onUpdate }: Props) {
           <Text style={styles.addBtnText}>+ Eintragen</Text>
         </TouchableOpacity>
       </View>
-
-      {latestWeight !== null && (
-        <Text style={styles.currentWeight}>{latestWeight.toFixed(1)} kg</Text>
-      )}
 
       {chartEntries.length >= 2 ? (
         <LineChart
@@ -100,19 +97,11 @@ export function WeightWidget({ entries, onUpdate }: Props) {
         </Text>
       )}
 
-      {entries.length > 0 && (
-        <View style={styles.entryList}>
-          {entries.slice(0, 5).map(e => (
-            <TouchableOpacity
-              key={e.id}
-              style={styles.entryRow}
-              onLongPress={() => handleLongPress(e)}
-            >
-              <Text style={styles.entryDate}>{formatDate(e.date)}</Text>
-              <Text style={styles.entryWeight}>{e.weight.toFixed(1)} kg</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+      {latestEntry && (
+        <TouchableOpacity style={styles.latestRow} onLongPress={handleLongPressLatest}>
+          <Text style={styles.latestDate}>{formatDate(latestEntry.date)}</Text>
+          <Text style={styles.latestWeight}>{latestEntry.weight.toFixed(1)} kg</Text>
+        </TouchableOpacity>
       )}
 
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
@@ -150,14 +139,12 @@ const styles = StyleSheet.create({
   addBtn:     { paddingHorizontal: 10, paddingVertical: 5, backgroundColor: '#1B4332', borderRadius: 8 },
   addBtnText: { fontSize: 12, fontWeight: '600', color: '#fff' },
 
-  currentWeight: { fontSize: 28, fontWeight: '700', color: '#111827', marginBottom: 8 },
-  chart:         { marginLeft: -16, marginBottom: 4 },
-  empty:         { fontSize: 13, color: '#9CA3AF', textAlign: 'center', paddingVertical: 24 },
+  chart:      { marginLeft: -16, marginBottom: 4 },
+  empty:      { fontSize: 13, color: '#9CA3AF', textAlign: 'center', paddingVertical: 24 },
 
-  entryList:   { borderTopWidth: 1, borderTopColor: '#F3F4F6', marginTop: 8 },
-  entryRow:    { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F9FAFB' },
-  entryDate:   { fontSize: 13, color: '#6B7280' },
-  entryWeight: { fontSize: 13, fontWeight: '600', color: '#111827' },
+  latestRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F3F4F6', marginTop: 4 },
+  latestDate:   { fontSize: 13, color: '#9CA3AF' },
+  latestWeight: { fontSize: 15, fontWeight: '700', color: '#111827' },
 
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
   modalSheet:   { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40 },
