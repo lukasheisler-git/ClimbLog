@@ -13,9 +13,15 @@ export type ClimbLogStackParamList = {
   ClimbLogStats:  undefined;
 };
 
+export type TrainingStackParamList = {
+  TrainingMain:   undefined;
+  SessionEditor:  { sessionId?: string; templateId?: string };
+  SessionDetail:  { sessionId: string };
+};
+
 export type AppTabParamList = {
   HomeTab:      undefined;
   ClimbLogTab:  NavigatorScreenParams<ClimbLogStackParamList>;
   HangboardTab: NavigatorScreenParams<HangboardStackParamList>;
-  TrainingTab:  undefined;
+  TrainingTab:  NavigatorScreenParams<TrainingStackParamList>;
 };
