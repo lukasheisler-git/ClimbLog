@@ -189,6 +189,7 @@ export function AddRouteScreen({ route, navigation }: Props) {
                 value={date}
                 mode="date"
                 display="default"
+                maximumDate={new Date()}
                 onChange={(_, d) => { setShowDP(false); if (d) setDate(d); }}
               />
             )}
@@ -198,6 +199,7 @@ export function AddRouteScreen({ route, navigation }: Props) {
             value={date}
             mode="date"
             display="spinner"
+            maximumDate={new Date()}
             onChange={(_, d) => { if (d) setDate(d); }}
             style={{ marginLeft: -10 }}
           />

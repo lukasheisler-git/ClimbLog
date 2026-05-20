@@ -1,16 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useMemo, useState } from 'react';
+import { NavigationProp } from '@react-navigation/native';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { G, Line, Rect, Text as SvgText } from 'react-native-svg';
-import { NavTabs } from '../../components/climblog/NavTabs';
 import { gradeIndex } from '../../hooks/useClimbLog';
 import { ClimbLogStackParamList } from '../../navigation/types';
 import { loadRoutes, updateRoute } from '../../storage/climblogStorage';
 import { ClimbResult, ClimbRoute, GRADES } from '../../types/climblog';
 
-type Props = NativeStackScreenProps<ClimbLogStackParamList, 'ClimbLogStats'>;
+interface Props {
+  navigation: NavigationProp<ClimbLogStackParamList>;
+  reloadKey: number;
+}
 
 const RESULT_COLOR: Record<ClimbResult, string> = {
   Onsight:  '#F59E0B',
@@ -19,7 +20,6 @@ const RESULT_COLOR: Record<ClimbResult, string> = {
   Project:  '#9CA3AF',
 };
 
-// Projekte werden im Diagramm nicht gestapelt — nur abgeschlossene Begehungen
 const CHART_ORDER: ClimbResult[] = ['Onsight', 'Flash', 'Redpoint'];
 
 interface BarData {
@@ -62,7 +62,6 @@ function GradeChart({ barData, maxTotal }: { barData: BarData[]; maxTotal: numbe
             </G>
           );
         })}
-
         {barData.map((d, i) => {
           const x = L_PAD + i * (BAR_W + BAR_GAP);
           let accH = 0;
@@ -111,18 +110,15 @@ function ProjectCard({ route, onComplete }: { route: ClimbRoute; onComplete: () 
   );
 }
 
-export function ClimbLogStatsScreen({ navigation }: Props) {
+export function ClimbLogStatsScreen({ reloadKey }: Props) {
   const [routes,          setRoutes]          = useState<ClimbRoute[]>([]);
   const [showAllProjects, setShowAllProjects] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadRoutes().then(setRoutes);
-      setShowAllProjects(false);
-    }, []),
-  );
+  useEffect(() => {
+    loadRoutes().then(setRoutes);
+    setShowAllProjects(false);
+  }, [reloadKey]);
 
-  // Projekte herausfiltern für alle Kennzahlen + Diagramm
   const completedRoutes = useMemo(() => routes.filter(r => r.result !== 'Project'), [routes]);
 
   const projects = useMemo(() => (
@@ -163,11 +159,7 @@ export function ClimbLogStatsScreen({ navigation }: Props) {
         {
           text: 'Ja, Rotpunkt!',
           onPress: async () => {
-            const updated: ClimbRoute = {
-              ...project,
-              result: 'Redpoint',
-              date:   new Date().toISOString(),
-            };
+            const updated: ClimbRoute = { ...project, result: 'Redpoint', date: new Date().toISOString() };
             await updateRoute(updated);
             setRoutes(prev => prev.map(r => r.id === updated.id ? updated : r));
           },
@@ -177,79 +169,59 @@ export function ClimbLogStatsScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={styles.root}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Kletterlog</Text>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.sectionTitle}>Kennzahlen</Text>
+      <View style={styles.statGrid}>
+        <StatCard label="Begehungen gesamt"  value={completedRoutes.length.toString()} />
+        <StatCard label="Schwerstes Redpoint" value={hardestGrade(completedRoutes, 'Redpoint') ?? '—'} />
+        <StatCard label="Schwerstes Onsight"  value={hardestGrade(completedRoutes, 'Onsight') ?? '—'} />
+        <StatCard label="Klettergebiete"      value={uniqueAreas.toString()} />
       </View>
-      <NavTabs
-        active="Statistik"
-        onPress={tab => {
-          if (tab === 'Begehungen') navigation.navigate('ClimbLogHome');
-          if (tab === 'Suche')     navigation.navigate('ClimbLogSearch');
-        }}
-      />
 
-      <ScrollView contentContainerStyle={styles.container}>
-
-        {/* 1. Kennzahlen — ganz oben */}
-        <Text style={styles.sectionTitle}>Kennzahlen</Text>
-        <View style={styles.statGrid}>
-          <StatCard label="Begehungen gesamt"  value={completedRoutes.length.toString()} />
-          <StatCard label="Schwerstes Redpoint" value={hardestGrade(completedRoutes, 'Redpoint') ?? '—'} />
-          <StatCard label="Schwerstes Onsight"  value={hardestGrade(completedRoutes, 'Onsight') ?? '—'} />
-          <StatCard label="Klettergebiete"      value={uniqueAreas.toString()} />
-        </View>
-
-        {/* 2. Balkendiagramm (ohne Projekte) */}
-        <Text style={[styles.sectionTitle, { marginTop: 28 }]}>Begehungen nach Schwierigkeitsgrad</Text>
-        {barData.length === 0 ? (
-          <Text style={styles.empty}>Noch keine abgeschlossenen Begehungen.</Text>
-        ) : (
-          <View style={styles.chartCard}>
-            <GradeChart barData={barData} maxTotal={maxTotal} />
-            <View style={styles.legend}>
-              {CHART_ORDER.map(result => (
-                <View key={result} style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: RESULT_COLOR[result] }]} />
-                  <Text style={styles.legendText}>{result}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* 3. Offene Projekte */}
-        <Text style={[styles.sectionTitle, { marginTop: 28 }]}>Offene Projekte</Text>
-        {projects.length === 0 ? (
-          <Text style={styles.empty}>Keine offenen Projekte.</Text>
-        ) : (
-          <>
-            {visibleProjects.map(p => (
-              <ProjectCard key={p.id} route={p} onComplete={() => markAsRedpoint(p)} />
+      <Text style={[styles.sectionTitle, { marginTop: 28 }]}>Begehungen nach Schwierigkeitsgrad</Text>
+      {barData.length === 0 ? (
+        <Text style={styles.empty}>Noch keine abgeschlossenen Begehungen.</Text>
+      ) : (
+        <View style={styles.chartCard}>
+          <GradeChart barData={barData} maxTotal={maxTotal} />
+          <View style={styles.legend}>
+            {CHART_ORDER.map(result => (
+              <View key={result} style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: RESULT_COLOR[result] }]} />
+                <Text style={styles.legendText}>{result}</Text>
+              </View>
             ))}
-            {projects.length > 3 && (
-              <TouchableOpacity style={styles.showMoreBtn} onPress={() => setShowAllProjects(v => !v)}>
-                <Text style={styles.showMoreText}>
-                  {showAllProjects ? 'Weniger anzeigen' : `Alle ${projects.length} Projekte anzeigen`}
-                </Text>
-                <Ionicons
-                  name={showAllProjects ? 'chevron-up-outline' : 'chevron-down-outline'}
-                  size={14}
-                  color="#1B4332"
-                />
-              </TouchableOpacity>
-            )}
-          </>
-        )}
-      </ScrollView>
-    </View>
+          </View>
+        </View>
+      )}
+
+      <Text style={[styles.sectionTitle, { marginTop: 28 }]}>Offene Projekte</Text>
+      {projects.length === 0 ? (
+        <Text style={styles.empty}>Keine offenen Projekte.</Text>
+      ) : (
+        <>
+          {visibleProjects.map(p => (
+            <ProjectCard key={p.id} route={p} onComplete={() => markAsRedpoint(p)} />
+          ))}
+          {projects.length > 3 && (
+            <TouchableOpacity style={styles.showMoreBtn} onPress={() => setShowAllProjects(v => !v)}>
+              <Text style={styles.showMoreText}>
+                {showAllProjects ? 'Weniger anzeigen' : `Alle ${projects.length} Projekte anzeigen`}
+              </Text>
+              <Ionicons
+                name={showAllProjects ? 'chevron-up-outline' : 'chevron-down-outline'}
+                size={14}
+                color="#1B4332"
+              />
+            </TouchableOpacity>
+          )}
+        </>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  root:      { flex: 1, backgroundColor: '#F3F4F6' },
-  header:    { paddingHorizontal: 20, paddingTop: 52, paddingBottom: 16 },
-  title:     { fontSize: 26, fontWeight: '700', color: '#111827' },
   container: { paddingHorizontal: 16, paddingBottom: 48 },
 
   sectionTitle: { fontSize: 13, fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 },

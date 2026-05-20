@@ -1,19 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useCallback, useMemo, useState } from 'react';
+import { NavigationProp } from '@react-navigation/native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList, ScrollView, StyleSheet, Text,
   TextInput, TouchableOpacity, View,
 } from 'react-native';
-import { NavTabs } from '../../components/climblog/NavTabs';
 import { RouteCard } from '../../components/climblog/RouteCard';
 import { DEFAULT_FILTER, FilterState, SortOrder, applyFilter, gradeIndex } from '../../hooks/useClimbLog';
 import { ClimbLogStackParamList } from '../../navigation/types';
 import { deleteRoute, loadRoutes } from '../../storage/climblogStorage';
 import { ClimbResult, ClimbRoute, ClimbStyle, GRADES } from '../../types/climblog';
 
-type Props = NativeStackScreenProps<ClimbLogStackParamList, 'ClimbLogSearch'>;
+interface Props {
+  navigation: NavigationProp<ClimbLogStackParamList>;
+  reloadKey: number;
+}
 
 const STYLES: (ClimbStyle | 'Alle')[]   = ['Alle', 'Lead', 'Boulder', 'Multi-Pitch'];
 const RESULTS: (ClimbResult | 'Alle')[] = ['Alle', 'Onsight', 'Flash', 'Redpoint', 'Project'];
@@ -24,7 +25,6 @@ const SORTS: { key: SortOrder; label: string }[] = [
   { key: 'grade-desc', label: 'Schwer→Leicht' },
 ];
 
-// Modul-level Komponente — stabile Typreferenz verhindert TextInput-Remounting
 interface FilterSectionProps {
   filter: FilterState;
   onChange: <K extends keyof FilterState>(key: K, val: FilterState[K]) => void;
@@ -51,7 +51,6 @@ function FilterChipsRow<T extends string>({ options, value, onChange }: {
 function FilterSection({ filter, onChange }: FilterSectionProps) {
   return (
     <View style={filterSt.container}>
-      {/* Schwierigkeit */}
       <Text style={filterSt.label}>Schwierigkeit</Text>
       <View style={filterSt.rangeBlock}>
         <View style={filterSt.rangeCol}>
@@ -84,15 +83,12 @@ function FilterSection({ filter, onChange }: FilterSectionProps) {
         </View>
       </View>
 
-      {/* Stil */}
       <Text style={filterSt.label}>Stil</Text>
       <FilterChipsRow options={STYLES} value={filter.style} onChange={v => onChange('style', v)} />
 
-      {/* Ergebnis */}
       <Text style={filterSt.label}>Ergebnis</Text>
       <FilterChipsRow options={RESULTS} value={filter.result} onChange={v => onChange('result', v)} />
 
-      {/* Sortierung */}
       <Text style={filterSt.label}>Sortierung</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={filterSt.chipRow}>
         {SORTS.map(s => (
@@ -109,16 +105,15 @@ function FilterSection({ filter, onChange }: FilterSectionProps) {
   );
 }
 
-export function ClimbLogSearchScreen({ navigation }: Props) {
+export function ClimbLogSearchScreen({ navigation, reloadKey }: Props) {
   const [allRoutes,   setAllRoutes]   = useState<ClimbRoute[]>([]);
   const [filter,      setFilter]      = useState<FilterState>(DEFAULT_FILTER);
   const [showFilters, setShowFilters] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => { loadRoutes().then(setAllRoutes); }, []),
-  );
+  useEffect(() => {
+    loadRoutes().then(setAllRoutes);
+  }, [reloadKey]);
 
-  // useCallback: stabile Funktionsreferenz damit FilterSection nicht neu-rendert
   const handleFilterChange = useCallback(<K extends keyof FilterState>(key: K, val: FilterState[K]) => {
     setFilter(prev => ({ ...prev, [key]: val }));
   }, []);
@@ -140,19 +135,6 @@ export function ClimbLogSearchScreen({ navigation }: Props) {
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Kletterlog</Text>
-      </View>
-
-      <NavTabs
-        active="Suche"
-        onPress={tab => {
-          if (tab === 'Begehungen') navigation.navigate('ClimbLogHome');
-          if (tab === 'Statistik')  navigation.navigate('ClimbLogStats');
-        }}
-      />
-
-      {/* Suchfeld — außerhalb der FlatList, verliert nie den Fokus */}
       <View style={styles.searchArea}>
         <TextInput
           style={styles.searchInput}
@@ -178,7 +160,6 @@ export function ClimbLogSearchScreen({ navigation }: Props) {
         data={results}
         keyExtractor={r => r.id}
         renderItem={renderItem}
-        // FilterSection ist modul-level → stabiler Typ → kein Remounting
         ListHeaderComponent={showFilters
           ? <FilterSection filter={filter} onChange={handleFilterChange} />
           : null
@@ -192,11 +173,8 @@ export function ClimbLogSearchScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { paddingHorizontal: 20, paddingTop: 52, paddingBottom: 16 },
-  title:  { fontSize: 26, fontWeight: '700', color: '#111827' },
-  list:   { paddingHorizontal: 16, paddingBottom: 40 },
-
+  root:             { flex: 1 },
+  list:             { paddingHorizontal: 16, paddingBottom: 40 },
   searchArea:       { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 4, gap: 8 },
   searchInput:      { flex: 1, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1.5, borderColor: '#E5E7EB', paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, color: '#111827' },
   filterToggle:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 10, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1.5, borderColor: '#E5E7EB' },
@@ -205,16 +183,15 @@ const styles = StyleSheet.create({
   empty:            { fontSize: 14, color: '#9CA3AF', textAlign: 'center', marginTop: 32 },
 });
 
-// Styles für die modul-level FilterSection — separat damit StyleSheet.create außerhalb der Komponente liegt
 const filterSt = StyleSheet.create({
-  container:   { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 4 },
-  label:       { fontSize: 11, fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.7, marginTop: 14, marginBottom: 8 },
-  rangeBlock:  { gap: 8 },
-  rangeCol:    { gap: 4 },
-  rangeLabel:  { fontSize: 11, color: '#9CA3AF', fontWeight: '500' },
-  chipRow:     { flexDirection: 'row', gap: 6, paddingRight: 4 },
-  chip:        { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#fff' },
-  chipActive:  { backgroundColor: '#1B4332', borderColor: '#1B4332' },
-  chipText:    { fontSize: 12, fontWeight: '600', color: '#6B7280' },
+  container:      { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 4 },
+  label:          { fontSize: 11, fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.7, marginTop: 14, marginBottom: 8 },
+  rangeBlock:     { gap: 8 },
+  rangeCol:       { gap: 4 },
+  rangeLabel:     { fontSize: 11, color: '#9CA3AF', fontWeight: '500' },
+  chipRow:        { flexDirection: 'row', gap: 6, paddingRight: 4 },
+  chip:           { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: '#fff' },
+  chipActive:     { backgroundColor: '#1B4332', borderColor: '#1B4332' },
+  chipText:       { fontSize: 12, fontWeight: '600', color: '#6B7280' },
   chipTextActive: { color: '#fff' },
 });

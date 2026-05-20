@@ -5,11 +5,10 @@ import { Text } from 'react-native';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { ClimbLogNavigator } from './ClimbLogNavigator';
 import { HangboardNavigator } from './HangboardNavigator';
+import { TrainingNavigator } from './TrainingNavigator';
 import { AppTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
-
-function TrainingScreen() { return <Text style={{ margin: 40, fontSize: 16, color: '#6B7280' }}>Training — kommt bald</Text>; }
 
 const ICON_MAP: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
   HomeTab:      'home-outline',
@@ -36,7 +35,7 @@ export function AppNavigator() {
       <Tab.Screen name="HomeTab"      component={HomeScreen}        options={{ tabBarLabel: 'Home' }} />
       <Tab.Screen name="ClimbLogTab"  component={ClimbLogNavigator} options={{ tabBarLabel: 'Kletterlog' }} />
       <Tab.Screen name="HangboardTab" component={HangboardNavigator} options={{ tabBarLabel: 'Hangboard' }} />
-      <Tab.Screen name="TrainingTab"  component={TrainingScreen}    options={{ tabBarLabel: 'Training' }} />
+      <Tab.Screen name="TrainingTab"  component={TrainingNavigator} options={{ tabBarLabel: 'Training' }} />
     </Tab.Navigator>
   );
 }
