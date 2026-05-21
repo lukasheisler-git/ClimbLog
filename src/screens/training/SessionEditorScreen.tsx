@@ -18,6 +18,14 @@ function makeId(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
+function templateHash(s: Pick<TrainingSession, 'name' | 'category' | 'duration' | 'exercises'>): string {
+  const exKey = [...s.exercises]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(e => `${e.name}|${e.sets ?? ''}|${e.reps ?? ''}|${e.weight ?? ''}`)
+    .join(',');
+  return `${s.name.trim()}|${s.category}|${s.duration}|${exKey}`;
+}
+
 function isoToDate(iso: string): Date { return new Date(iso); }
 function dateToIso(d: Date): string { return d.toISOString(); }
 function formatDate(d: Date): string {
@@ -114,7 +122,7 @@ export function SessionEditorScreen({ route, navigation }: Props) {
       isTemplate: false,
     };
 
-    const doSave = async () => {
+    const persistAll = async () => {
       if (isEdit) { await updateSession(session); }
       else        { await saveSession(session); }
       if (saveAsTemplate) {
@@ -123,29 +131,45 @@ export function SessionEditorScreen({ route, navigation }: Props) {
       navigation.goBack();
     };
 
+    const checkTemplateDup = async (onConfirmed: () => Promise<void>) => {
+      if (!saveAsTemplate) { await onConfirmed(); return; }
+      const all = await loadAllSessions();
+      const hash = templateHash(session);
+      const dup = all.find(t => t.isTemplate && templateHash(t) === hash);
+      if (!dup) { await onConfirmed(); return; }
+      Alert.alert(
+        'Template bereits vorhanden',
+        'Ein Template mit diesen Einstellungen existiert bereits. Trotzdem speichern?',
+        [
+          { text: 'Abbrechen', style: 'cancel' },
+          { text: 'Trotzdem speichern', onPress: onConfirmed },
+        ],
+      );
+    };
+
     if (!isEdit) {
       const targetDate = session.date.slice(0, 10);
       const all = await loadAllSessions();
-      const duplicate = all.find(
+      const dupSession = all.find(
         s => !s.isTemplate && s.id !== session.id &&
              s.name === session.name &&
              s.date.slice(0, 10) === targetDate &&
              s.category === session.category,
       );
-      if (duplicate) {
+      if (dupSession) {
         Alert.alert(
           'Einheit bereits vorhanden',
-          `Diese Einheit wurde heute bereits geloggt. Trotzdem speichern?`,
+          'Diese Einheit wurde heute bereits geloggt. Trotzdem speichern?',
           [
             { text: 'Abbrechen', style: 'cancel' },
-            { text: 'Trotzdem speichern', onPress: doSave },
+            { text: 'Trotzdem speichern', onPress: () => checkTemplateDup(persistAll) },
           ],
         );
         return;
       }
     }
 
-    await doSave();
+    await checkTemplateDup(persistAll);
   };
 
   return (
