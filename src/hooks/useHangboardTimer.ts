@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { HangboardWorkout } from '../types/hangboard';
-import { playLongBeep, playShortBeep } from '../utils/audioUtils';
+import {
+  playHangCountdownBeep, playHangEndBeep,
+  playPauseCountdownBeep, playPauseEndBeep,
+} from '../utils/audioUtils';
 
 export type TimerPhase = 'idle' | 'getReady' | 'hanging' | 'repRest' | 'setRest' | 'complete';
 
@@ -26,10 +29,10 @@ const IDLE: InternalState = {
   elapsedSeconds: 0,
 };
 
-const GET_READY_SECONDS = 15;
+const GET_READY_SECONDS = 10;
 
 // Reine Übergangsfunktion — bestimmt den nächsten Zustand wenn ein Countdown
-// auf 0 fällt. Wird im interval-Callback aufgerufen (kein React-State-Zugriff).
+// auf 0 fällt. Kein React-State-Zugriff.
 function advance(s: InternalState, workout: HangboardWorkout): InternalState {
   const set = workout.sets[s.setIndex];
 
@@ -64,12 +67,11 @@ function advance(s: InternalState, workout: HangboardWorkout): InternalState {
 }
 
 export function useHangboardTimer(workout: HangboardWorkout | null) {
-  // Alle mutable Timer-Daten im Ref — verhindert Stale-Closure-Probleme im Interval.
-  const stateRef  = useRef<InternalState>({ ...IDLE });
-  const workoutRef = useRef(workout);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stateRef            = useRef<InternalState>({ ...IDLE });
+  const workoutRef          = useRef(workout);
+  const intervalRef         = useRef<ReturnType<typeof setInterval> | null>(null);
+  const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Nur die für das Rendering benötigten Werte als State
   const [display, setDisplay] = useState<InternalState>({ ...IDLE });
 
   useEffect(() => { workoutRef.current = workout; }, [workout]);
@@ -80,36 +82,61 @@ export function useHangboardTimer(workout: HangboardWorkout | null) {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
   }, []);
 
+  const clearTransitionTimeout = useCallback(() => {
+    if (transitionTimeoutRef.current) { clearTimeout(transitionTimeoutRef.current); transitionTimeoutRef.current = null; }
+  }, []);
+
+  // 300ms nach Anzeige von 0s: Phasenwechsel + Ton
+  const scheduleTransition = useCallback(() => {
+    clearTransitionTimeout();
+    transitionTimeoutRef.current = setTimeout(() => {
+      transitionTimeoutRef.current = null;
+      const s = stateRef.current;
+      const w = workoutRef.current;
+      if (!w || s.isPaused) return;
+
+      const prevPhase = s.phase;
+      const next = advance(s, w);
+      stateRef.current = { ...next, elapsedSeconds: s.elapsedSeconds };
+
+      if (next.phase === 'repRest' || next.phase === 'setRest') {
+        playHangEndBeep();                   // Hängen → Pause
+      } else if (next.phase === 'hanging' && (prevPhase === 'repRest' || prevPhase === 'setRest' || prevPhase === 'getReady')) {
+        playPauseEndBeep();                  // Pause / GetReady → Hängen
+      } else if (next.phase === 'complete') {
+        playPauseEndBeep();
+        stopTick();
+      }
+
+      sync();
+    }, 300);
+  }, [clearTransitionTimeout, stopTick]);
+
   const tick = useCallback(() => {
     const s = stateRef.current;
     const w = workoutRef.current;
     if (!w || s.isPaused || s.phase === 'idle' || s.phase === 'complete') return;
+    if (s.secondsLeft === 0) return; // Übergang läuft bereits
 
-    const elapsed = s.elapsedSeconds + 1;
+    const elapsed    = s.elapsedSeconds + 1;
+    const newSeconds = s.secondsLeft - 1;
 
-    if (s.secondsLeft > 1) {
-      stateRef.current = { ...s, secondsLeft: s.secondsLeft - 1, elapsedSeconds: elapsed };
+    if (newSeconds > 0) {
+      // Countdown-Beeps bei 2s und 1s verbleibend (nur Hängen + Pause, nicht getReady)
+      if (newSeconds <= 2) {
+        if (s.phase === 'hanging') playHangCountdownBeep();
+        else if (s.phase === 'repRest' || s.phase === 'setRest') playPauseCountdownBeep();
+      }
+      stateRef.current = { ...s, secondsLeft: newSeconds, elapsedSeconds: elapsed };
       sync();
       return;
     }
 
-    // Countdown abgelaufen → Phase wechseln
-    const prevPhase = s.phase;
-    const next = advance(s, w);
-    stateRef.current = { ...next, elapsedSeconds: elapsed };
-
-    // Ton-Feedback beim Phasenwechsel
-    if (next.phase === 'repRest' || next.phase === 'setRest') {
-      playShortBeep(); // Hang beendet
-    } else if (next.phase === 'hanging' && (prevPhase === 'repRest' || prevPhase === 'setRest' || prevPhase === 'getReady')) {
-      playLongBeep();  // Pause / Get-Ready beendet → jetzt hängen
-    } else if (next.phase === 'complete') {
-      playLongBeep();
-      stopTick();
-    }
-
+    // newSeconds === 0 → kurz 0s anzeigen, dann Phasenwechsel
+    stateRef.current = { ...s, secondsLeft: 0, elapsedSeconds: elapsed };
     sync();
-  }, [stopTick]);
+    scheduleTransition();
+  }, [scheduleTransition]);
 
   const startTick = useCallback(() => {
     stopTick();
@@ -132,29 +159,36 @@ export function useHangboardTimer(workout: HangboardWorkout | null) {
 
   const pause = useCallback(() => {
     stopTick();
+    clearTransitionTimeout();
     stateRef.current = { ...stateRef.current, isPaused: true };
     sync();
-  }, [stopTick]);
+  }, [stopTick, clearTransitionTimeout]);
 
   const resume = useCallback(() => {
     stateRef.current = { ...stateRef.current, isPaused: false };
     sync();
-    startTick();
-  }, [startTick]);
+    // Falls bei 0s pausiert wurde: Übergang neu starten statt tick
+    const s = stateRef.current;
+    if (s.secondsLeft === 0 && s.phase !== 'idle' && s.phase !== 'complete') {
+      scheduleTransition();
+    } else {
+      startTick();
+    }
+  }, [startTick, scheduleTransition]);
 
   const abort = useCallback(() => {
     stopTick();
+    clearTransitionTimeout();
     stateRef.current = { ...IDLE };
     sync();
-  }, [stopTick]);
+  }, [stopTick, clearTransitionTimeout]);
 
-  // Aufräumen beim Unmount
-  useEffect(() => () => stopTick(), [stopTick]);
+  useEffect(() => () => { stopTick(); clearTransitionTimeout(); }, [stopTick, clearTransitionTimeout]);
 
   return {
     ...display,
     currentSet: workout?.sets[display.setIndex] ?? null,
-    totalSets: workout?.sets.length ?? 0,
+    totalSets:  workout?.sets.length ?? 0,
     start,
     pause,
     resume,
