@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useRef, useMemo, useState } from 'react';
 import {
   Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
@@ -123,6 +123,7 @@ const MONTH_NAMES = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'S
 
 function Heatmap({ sessions }: { sessions: TrainingSession[] }) {
   const [selected, setSelected] = useState<{ date: string; count: number } | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
   const today     = new Date();
   const todayIso  = toIsoDate(today);
@@ -163,7 +164,12 @@ function Heatmap({ sessions }: { sessions: TrainingSession[] }) {
 
   return (
     <View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        onLayout={() => scrollRef.current?.scrollToEnd({ animated: false })}
+      >
         <Svg width={SVG_W} height={SVG_H}>
           {/* Month labels */}
           {monthLabels.map(({ label, x }) => (
@@ -245,7 +251,7 @@ export function TrainingStatsScreen({ sessions }: Props) {
         <StatCard label="Diese Woche"      value={stats.weekCount.toString()} />
         <StatCard label="Diesen Monat"     value={stats.monthCount.toString()} />
         <StatCard label="Gesamtstunden"    value={stats.totalHours.toFixed(1) + ' h'} />
-        <StatCard label="Längste Streak"   value={stats.longestStreak + ' Tage'} />
+        <StatCard label="letzte 4 Wochen"  value={`${stats.activeDays28} / 28`} />
       </View>
 
       {/* Donut */}

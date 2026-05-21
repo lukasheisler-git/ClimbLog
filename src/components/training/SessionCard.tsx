@@ -29,6 +29,10 @@ export function SessionCard({ session, onPress }: Props) {
             <Text style={styles.metaText}>{session.exercises.length} Übung{session.exercises.length !== 1 ? 'en' : ''}</Text>
           </>
         )}
+        <Text style={styles.dot}>·</Text>
+        <View style={styles.intensityBadge}>
+          <Text style={styles.intensityText}>⚡ {session.intensity ?? 5}</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -41,7 +45,9 @@ const styles = StyleSheet.create({
   },
   top:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 8 },
   name:     { flex: 1, fontSize: 15, fontWeight: '600', color: '#111827' },
-  meta:     { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  metaText: { fontSize: 12, color: '#9CA3AF' },
-  dot:      { fontSize: 12, color: '#D1D5DB' },
+  meta:           { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  metaText:       { fontSize: 12, color: '#9CA3AF' },
+  dot:            { fontSize: 12, color: '#D1D5DB' },
+  intensityBadge: { backgroundColor: '#FEF3C7', borderRadius: 5, paddingHorizontal: 5, paddingVertical: 1 },
+  intensityText:  { fontSize: 11, fontWeight: '600', color: '#92400E' },
 });

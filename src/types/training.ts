@@ -38,6 +38,7 @@ export interface TrainingSession {
   category: TrainingCategory;
   date: string;           // ISO
   duration: number;       // Minuten
+  intensity: number;      // 1–10
   notes?: string;
   exercises: TrainingExercise[];
   isTemplate: boolean;

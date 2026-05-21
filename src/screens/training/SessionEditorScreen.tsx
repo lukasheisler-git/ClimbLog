@@ -1,4 +1,5 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
+import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useRef, useState } from 'react';
@@ -33,6 +34,7 @@ export function SessionEditorScreen({ route, navigation }: Props) {
   const [category,   setCategory]   = useState<TrainingCategory>('Open Climbing');
   const [date,       setDate]       = useState(new Date());
   const [duration,   setDuration]   = useState('60');
+  const [intensity,  setIntensity]  = useState(5);
   const [notes,      setNotes]      = useState('');
   const [exercises,  setExercises]  = useState<TrainingExercise[]>([]);
   const [saveAsTemplate, setSaveAsTemplate] = useState(false);
@@ -54,18 +56,19 @@ export function SessionEditorScreen({ route, navigation }: Props) {
         if (s) { originalId.current = s.id; fill(s); }
       } else if (templateId) {
         const t = all.find(x => x.id === templateId);
-        if (t) { fill(t); setDate(new Date()); } // always use today for new sessions from template
+        if (t) { fill(t, true); setDate(new Date()); } // always reset intensity+date for template-based sessions
       }
     }
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function fill(s: TrainingSession) {
+  function fill(s: TrainingSession, resetIntensity = false) {
     setName(s.name);
     setCategory(s.category);
     setDate(isoToDate(s.date));
     setDuration(String(s.duration));
+    setIntensity(resetIntensity ? 5 : (s.intensity ?? 5));
     setNotes(s.notes ?? '');
     setExercises(s.exercises.map(e => ({ ...e, id: e.id || makeId() })));
   }
@@ -105,19 +108,44 @@ export function SessionEditorScreen({ route, navigation }: Props) {
       category,
       date: dateToIso(date),
       duration: dur,
+      intensity,
       notes: notes.trim() || undefined,
       exercises,
       isTemplate: false,
     };
 
-    if (isEdit) { await updateSession(session); }
-    else        { await saveSession(session); }
+    const doSave = async () => {
+      if (isEdit) { await updateSession(session); }
+      else        { await saveSession(session); }
+      if (saveAsTemplate) {
+        await saveSession({ ...session, id: makeId(), isTemplate: true });
+      }
+      navigation.goBack();
+    };
 
-    if (saveAsTemplate) {
-      await saveSession({ ...session, id: makeId(), isTemplate: true });
+    if (!isEdit) {
+      const targetDate = session.date.slice(0, 10);
+      const all = await loadAllSessions();
+      const duplicate = all.find(
+        s => !s.isTemplate && s.id !== session.id &&
+             s.name === session.name &&
+             s.date.slice(0, 10) === targetDate &&
+             s.category === session.category,
+      );
+      if (duplicate) {
+        Alert.alert(
+          'Einheit bereits vorhanden',
+          `Diese Einheit wurde heute bereits geloggt. Trotzdem speichern?`,
+          [
+            { text: 'Abbrechen', style: 'cancel' },
+            { text: 'Trotzdem speichern', onPress: doSave },
+          ],
+        );
+        return;
+      }
     }
 
-    navigation.goBack();
+    await doSave();
   };
 
   return (
@@ -182,6 +210,23 @@ export function SessionEditorScreen({ route, navigation }: Props) {
           keyboardType="number-pad"
           placeholder="60"
           placeholderTextColor="#9CA3AF"
+        />
+
+        {/* Intensität */}
+        <View style={styles.intensityHeader}>
+          <Text style={[styles.fieldLabel, { marginTop: 0 }]}>Intensität</Text>
+          <Text style={styles.intensityValue}>{intensity}</Text>
+        </View>
+        <Slider
+          style={styles.slider}
+          minimumValue={1}
+          maximumValue={10}
+          step={1}
+          value={intensity}
+          onValueChange={v => setIntensity(v)}
+          minimumTrackTintColor="#1B4332"
+          maximumTrackTintColor="#E5E7EB"
+          thumbTintColor="#1B4332"
         />
 
         {/* Notizen */}
@@ -335,4 +380,8 @@ const styles = StyleSheet.create({
 
   templateRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', borderRadius: 10, borderWidth: 1.5, borderColor: '#E5E7EB', paddingHorizontal: 14, paddingVertical: 12, marginTop: 16 },
   templateLabel:{ fontSize: 15, color: '#374151' },
+
+  intensityHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 16, marginBottom: 2 },
+  intensityValue:  { fontSize: 18, fontWeight: '700', color: '#1B4332' },
+  slider:          { marginHorizontal: -4, marginTop: 2, marginBottom: 4 },
 });

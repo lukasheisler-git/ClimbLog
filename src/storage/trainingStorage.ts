@@ -4,12 +4,12 @@ import { TrainingSession } from '../types/training';
 const KEY = '@training:sessions_v1';
 
 const DEFAULT_TEMPLATES: Omit<TrainingSession, 'id'>[] = [
-  { name: 'Boulder Session',      category: 'Strength & Power', date: new Date().toISOString(), duration: 90,  exercises: [], isTemplate: true },
-  { name: 'Klettersession Halle', category: 'Open Climbing',    date: new Date().toISOString(), duration: 90,  exercises: [], isTemplate: true },
-  { name: 'Outdoor Klettern',     category: 'Open Climbing',    date: new Date().toISOString(), duration: 180, exercises: [], isTemplate: true },
-  { name: 'Yoga',                 category: 'Cross Training',   date: new Date().toISOString(), duration: 60,  exercises: [], isTemplate: true },
-  { name: 'Mobility Workout',     category: 'Cross Training',   date: new Date().toISOString(), duration: 45,  exercises: [], isTemplate: true },
-  { name: 'Krafttraining',        category: 'Conditioning',     date: new Date().toISOString(), duration: 60,  exercises: [], isTemplate: true },
+  { name: 'Boulder Session',      category: 'Strength & Power', date: new Date().toISOString(), duration: 90,  intensity: 5, exercises: [], isTemplate: true },
+  { name: 'Klettersession Halle', category: 'Open Climbing',    date: new Date().toISOString(), duration: 90,  intensity: 5, exercises: [], isTemplate: true },
+  { name: 'Outdoor Klettern',     category: 'Open Climbing',    date: new Date().toISOString(), duration: 180, intensity: 5, exercises: [], isTemplate: true },
+  { name: 'Yoga',                 category: 'Cross Training',   date: new Date().toISOString(), duration: 60,  intensity: 5, exercises: [], isTemplate: true },
+  { name: 'Mobility Workout',     category: 'Cross Training',   date: new Date().toISOString(), duration: 45,  intensity: 5, exercises: [], isTemplate: true },
+  { name: 'Krafttraining',        category: 'Conditioning',     date: new Date().toISOString(), duration: 60,  intensity: 5, exercises: [], isTemplate: true },
 ];
 
 function makeId(): string {
@@ -18,7 +18,9 @@ function makeId(): string {
 
 export async function loadAllSessions(): Promise<TrainingSession[]> {
   const raw = await AsyncStorage.getItem(KEY);
-  return raw ? JSON.parse(raw) : [];
+  if (!raw) return [];
+  const sessions: TrainingSession[] = JSON.parse(raw);
+  return sessions.map(s => ({ ...s, intensity: (s.intensity as number | undefined) ?? 5 }));
 }
 
 async function writeAll(sessions: TrainingSession[]): Promise<void> {

@@ -3,12 +3,12 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TrainingStackParamList } from '../../navigation/types';
 import React, { useState } from 'react';
 import {
-  FlatList, Modal, ScrollView, StyleSheet,
+  Alert, FlatList, Modal, ScrollView, StyleSheet,
   Text, TouchableOpacity, View,
 } from 'react-native';
 import { CategoryBadge } from '../../components/training/CategoryBadge';
 import { SessionCard } from '../../components/training/SessionCard';
-import { saveSession } from '../../storage/trainingStorage';
+import { deleteSession } from '../../storage/trainingStorage';
 import { TrainingSession } from '../../types/training';
 
 interface Props {
@@ -28,6 +28,17 @@ export function TrainingLogScreen({ navigation, sessions, templates, onReload }:
   const openFromTemplate = async (template: TrainingSession) => {
     setModalVisible(false);
     navigation.navigate('SessionEditor', { templateId: template.id });
+  };
+
+  const deleteTemplate = (template: TrainingSession) => {
+    Alert.alert(
+      'Template löschen?',
+      `„${template.name}" wirklich löschen?`,
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        { text: 'Löschen', style: 'destructive', onPress: async () => { await deleteSession(template.id); onReload(); } },
+      ],
+    );
   };
 
   const openEmpty = () => {
@@ -77,6 +88,9 @@ export function TrainingLogScreen({ navigation, sessions, templates, onReload }:
           >
             {templates.map(t => (
               <TouchableOpacity key={t.id} style={styles.templateCard} onPress={() => openFromTemplate(t)}>
+                <TouchableOpacity style={styles.templateDeleteBtn} onPress={() => deleteTemplate(t)} hitSlop={6}>
+                  <Ionicons name="trash-outline" size={13} color="#9CA3AF" />
+                </TouchableOpacity>
                 <CategoryBadge category={t.category} small />
                 <Text style={styles.templateName} numberOfLines={2}>{t.name}</Text>
                 <Text style={styles.templateDuration}>{t.duration} min</Text>
@@ -130,6 +144,7 @@ const styles = StyleSheet.create({
     width: 120, backgroundColor: '#F9FAFB', borderRadius: 12, padding: 12, gap: 6,
     borderWidth: 1.5, borderColor: '#E5E7EB',
   },
+  templateDeleteBtn: { position: 'absolute', top: 8, right: 8, zIndex: 1 },
   templateName:     { fontSize: 13, fontWeight: '600', color: '#111827', lineHeight: 17 },
   templateDuration: { fontSize: 11, color: '#9CA3AF' },
 

@@ -5,10 +5,10 @@ import { TrainingCategory, TrainingSession } from '../types/training';
 export type StatsRange = '4w' | '8w' | 'all';
 
 export interface TrainingStats {
-  weekCount:     number;
-  monthCount:    number;
-  totalHours:    number;
-  longestStreak: number;
+  weekCount:    number;
+  monthCount:   number;
+  totalHours:   number;
+  activeDays28: number;
 }
 
 export interface CategoryCount {
@@ -17,25 +17,8 @@ export interface CategoryCount {
   percent:  number;
 }
 
-function daysBetween(a: Date, b: Date): number {
-  return Math.round((b.getTime() - a.getTime()) / 86400000);
-}
-
-function longestStreak(sessions: TrainingSession[]): number {
-  const days = [...new Set(sessions.map(s => s.date.slice(0, 10)))].sort();
-  if (!days.length) return 0;
-  let max = 1, cur = 1;
-  for (let i = 1; i < days.length; i++) {
-    const diff = daysBetween(new Date(days[i - 1]), new Date(days[i]));
-    cur = diff === 1 ? cur + 1 : 1;
-    if (cur > max) max = cur;
-  }
-  return max;
-}
-
 export function calcStats(sessions: TrainingSession[]): TrainingStats {
   const now   = new Date();
-  const today = now.toISOString().slice(0, 10);
 
   const weekStart = new Date(now);
   weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
@@ -43,12 +26,18 @@ export function calcStats(sessions: TrainingSession[]): TrainingStats {
 
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const weekCount  = sessions.filter(s => new Date(s.date) >= weekStart).length;
-  const monthCount = sessions.filter(s => new Date(s.date) >= monthStart).length;
-  const totalHours = sessions.reduce((sum, s) => sum + s.duration, 0) / 60;
+  const cutoff28 = new Date(now);
+  cutoff28.setDate(now.getDate() - 27);
+  cutoff28.setHours(0, 0, 0, 0);
 
-  void today;
-  return { weekCount, monthCount, totalHours, longestStreak: longestStreak(sessions) };
+  const weekCount   = sessions.filter(s => new Date(s.date) >= weekStart).length;
+  const monthCount  = sessions.filter(s => new Date(s.date) >= monthStart).length;
+  const totalHours  = sessions.reduce((sum, s) => sum + s.duration, 0) / 60;
+  const activeDays28 = new Set(
+    sessions.filter(s => new Date(s.date) >= cutoff28).map(s => s.date.slice(0, 10)),
+  ).size;
+
+  return { weekCount, monthCount, totalHours, activeDays28 };
 }
 
 export function filterByRange(sessions: TrainingSession[], range: StatsRange): TrainingSession[] {
