@@ -1,5 +1,3 @@
-export type BucketListType = 'Gebiet' | 'Route' | 'Tour';
-
 export interface WeightEntry {
   id: string;
   date: string;     // ISO-String
@@ -7,11 +5,28 @@ export interface WeightEntry {
   createdAt: number;
 }
 
+export type BucketListCategory = 'Gebiet' | 'Route' | 'Boulder' | 'Tour';
+
+export type TourType =
+  | 'Mehrseillänge'
+  | 'Hochtour'
+  | 'Skitour'
+  | 'Wanderung'
+  | 'Klettersteig'
+  | 'Alpinklettern';
+
 export interface BucketListItem {
   id: string;
   name: string;
-  type: BucketListType;
+  category: BucketListCategory;
+  grade?: string;        // Route — franz. System
+  boulderGrade?: string; // Boulder — franz. System
+  tourType?: TourType;   // Tour
   notes?: string;
-  done: boolean;
+  completed: boolean;
   createdAt: number;
+}
+
+export interface AppSettings {
+  showWeight: boolean;
 }

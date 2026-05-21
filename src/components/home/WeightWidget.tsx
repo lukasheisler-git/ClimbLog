@@ -133,7 +133,7 @@ export function WeightWidget({ entries, onUpdate }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card:       { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 4, elevation: 2 },
+  card:       { backgroundColor: '#fff', borderRadius: 14, padding: 16, paddingBottom: 20, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 4, elevation: 2 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   cardTitle:  { fontSize: 13, fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.8 },
   addBtn:     { paddingHorizontal: 10, paddingVertical: 5, backgroundColor: '#1B4332', borderRadius: 8 },

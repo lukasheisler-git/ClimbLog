@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BucketListItem, WeightEntry } from '../types/home';
+import { AppSettings, BucketListItem, WeightEntry } from '../types/home';
 
-const WEIGHT_KEY  = '@home:weight_entries';
-const BUCKET_KEY  = '@home:bucket_list';
+const WEIGHT_KEY   = '@home:weight_entries';
+const BUCKET_KEY   = '@home:bucket_list';
+const SETTINGS_KEY = '@settings';
 
 // --- Weight entries ---
 
@@ -26,7 +27,14 @@ export async function deleteWeightEntry(id: string): Promise<void> {
 
 export async function loadBucketList(): Promise<BucketListItem[]> {
   const raw = await AsyncStorage.getItem(BUCKET_KEY);
-  return raw ? JSON.parse(raw) : [];
+  if (!raw) return [];
+  const items = JSON.parse(raw) as any[];
+  // Migrate old shape: type→category, done→completed
+  return items.map(i => ({
+    ...i,
+    category:  i.category  ?? i.type ?? 'Gebiet',
+    completed: i.completed ?? i.done ?? false,
+  }));
 }
 
 export async function saveBucketItem(item: BucketListItem): Promise<void> {
@@ -47,4 +55,17 @@ export async function updateBucketItem(item: BucketListItem): Promise<void> {
 export async function deleteBucketItem(id: string): Promise<void> {
   const existing = await loadBucketList();
   await AsyncStorage.setItem(BUCKET_KEY, JSON.stringify(existing.filter(i => i.id !== id)));
+}
+
+// --- Settings ---
+
+const DEFAULT_SETTINGS: AppSettings = { showWeight: true };
+
+export async function loadSettings(): Promise<AppSettings> {
+  const raw = await AsyncStorage.getItem(SETTINGS_KEY);
+  return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : DEFAULT_SETTINGS;
+}
+
+export async function saveSettings(s: AppSettings): Promise<void> {
+  await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
 }
