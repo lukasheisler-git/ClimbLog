@@ -5,7 +5,13 @@ const KEY = '@climblog:routes_v2';
 
 export async function loadRoutes(): Promise<ClimbRoute[]> {
   const raw = await AsyncStorage.getItem(KEY);
-  return raw ? JSON.parse(raw) : [];
+  if (!raw) return [];
+  const routes: ClimbRoute[] = JSON.parse(raw);
+  return routes.map(r => ({
+    climbingStyles: [],
+    photos: [],
+    ...r,
+  }));
 }
 
 export async function saveRoute(route: ClimbRoute): Promise<void> {
