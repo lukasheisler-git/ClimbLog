@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { ClimbLogStackParamList } from '../../navigation/types';
 import { deleteRoute, loadRoutes } from '../../storage/climblogStorage';
-import { ClimbResult, ClimbRoute, PhotoItem } from '../../types/climblog';
+import { ClimbPhoto, ClimbResult, ClimbRoute } from '../../types/climblog';
 
 type Props = NativeStackScreenProps<ClimbLogStackParamList, 'RouteDetail'>;
 
@@ -36,7 +36,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function photoHeight(photo: PhotoItem): number {
+function photoHeight(photo: ClimbPhoto): number {
   return photo.width && photo.height
     ? Math.min(SCREEN_W * photo.height / photo.width, SCREEN_W * 1.5)
     : SCREEN_W * 0.75;
@@ -79,12 +79,12 @@ export function RouteDetailScreen({ route, navigation }: Props) {
     );
   };
 
-  const renderPhoto = useCallback(({ item }: { item: PhotoItem }) => {
+  const renderPhoto = useCallback(({ item }: { item: ClimbPhoto }) => {
     const h = photoHeight(item);
     return (
       <View style={{ width: SCREEN_W, height: h, overflow: 'hidden' }}>
         <Image
-          source={{ uri: `data:image/jpeg;base64,${item.data}` }}
+          source={{ uri: item.uri }}
           style={{ width: SCREEN_W, height: h }}
           resizeMode="contain"
         />

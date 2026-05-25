@@ -1,7 +1,6 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -11,9 +10,10 @@ import {
 import { ClimbLogStackParamList } from '../../navigation/types';
 import { loadRoutes, saveRoute, updateRoute } from '../../storage/climblogStorage';
 import {
-  CLIMBING_STYLES, ClimbResult, ClimbRoute, ClimbStyle,
-  ClimbingStyle, GRADES, PhotoItem, WALL_ANGLES, WallAngle,
+  CLIMBING_STYLES, ClimbPhoto, ClimbResult, ClimbRoute, ClimbStyle,
+  ClimbingStyle, GRADES, WALL_ANGLES, WallAngle,
 } from '../../types/climblog';
+import { deletePhoto, savePhoto } from '../../utils/photoStorage';
 
 type Props = NativeStackScreenProps<ClimbLogStackParamList, 'AddRoute'>;
 
@@ -76,13 +76,17 @@ export function AddRouteScreen({ route, navigation }: Props) {
   const [climbingStyles, setClimbingStyles] = useState<ClimbingStyle[]>([]);
   const [stars,          setStars]          = useState(0);
   const [notes,          setNotes]          = useState('');
-  const [photos,         setPhotos]         = useState<PhotoItem[]>([]);
+  const [photos,         setPhotos]         = useState<ClimbPhoto[]>([]);
   const [error,          setError]          = useState('');
   const [isLoaded,       setIsLoaded]       = useState(!isEditing);
 
-  const gradeScrollRef = useRef<ScrollView>(null);
-  const existingIdRef  = useRef<string | null>(null);
-  const existingAtRef  = useRef<number>(Date.now());
+  const gradeScrollRef   = useRef<ScrollView>(null);
+  const existingIdRef    = useRef<string | null>(null);
+  const existingAtRef    = useRef<number>(Date.now());
+  // URIs die in dieser Session neu hinzugefügt wurden → bei Abbruch löschen
+  const addedUrisRef     = useRef<Set<string>>(new Set());
+  // Fotos die aus einer bestehenden Route entfernt wurden → bei Speichern löschen
+  const pendingDeletesRef = useRef<ClimbPhoto[]>([]);
 
   useEffect(() => {
     if (!routeId) return;
@@ -116,28 +120,20 @@ export function AddRouteScreen({ route, navigation }: Props) {
     return () => clearTimeout(t);
   }, [isLoaded]);
 
+  // Bei Abbruch (Zurück-Button, Android-Back, Swipe): neu hinzugefügte Fotos löschen
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', () => {
+      const uris = [...addedUrisRef.current];
+      addedUrisRef.current.clear();
+      Promise.all(uris.map(deletePhoto)).catch(console.warn);
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   const toggleClimbingStyle = (s: ClimbingStyle) => {
     setClimbingStyles(prev =>
       prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s],
     );
-  };
-
-  // Komprimiert ein Asset und gibt ein PhotoItem zurück (oder null bei Fehler)
-  const processAsset = async (asset: ImagePicker.ImagePickerAsset): Promise<PhotoItem | null> => {
-    try {
-      const manipulated = await ImageManipulator.manipulateAsync(
-        asset.uri,
-        [{ resize: { width: 800 } }],
-        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true },
-      );
-      if (!manipulated.base64) return null;
-      const origW = asset.width  ?? 800;
-      const origH = asset.height ?? 600;
-      const scaledH = Math.round(800 * origH / origW);
-      return { data: manipulated.base64, width: 800, height: scaledH };
-    } catch {
-      return null;
-    }
   };
 
   const pickFromLibrary = async () => {
@@ -164,8 +160,9 @@ export function AddRouteScreen({ route, navigation }: Props) {
       Alert.alert('Limit erreicht', `Es wurden nur ${remaining} von ${pickerResult.assets.length} Fotos hinzugefügt (Maximum ${MAX_PHOTOS}).`);
     }
 
-    const processed = (await Promise.all(selected.map(processAsset))).filter((p): p is PhotoItem => p !== null);
-    if (processed.length > 0) setPhotos(prev => [...prev, ...processed]);
+    const saved = (await Promise.all(selected.map(savePhoto))).filter((p): p is ClimbPhoto => p !== null);
+    saved.forEach(p => addedUrisRef.current.add(p.uri));
+    if (saved.length > 0) setPhotos(prev => [...prev, ...saved]);
   };
 
   const pickFromCamera = async () => {
@@ -183,19 +180,36 @@ export function AddRouteScreen({ route, navigation }: Props) {
       quality: 1,
     });
     if (!pickerResult.canceled && pickerResult.assets[0]) {
-      const item = await processAsset(pickerResult.assets[0]);
-      if (item) setPhotos(prev => [...prev, item]);
-      else Alert.alert('Fehler', 'Bild konnte nicht verarbeitet werden.');
+      const saved = await savePhoto(pickerResult.assets[0]);
+      if (saved) {
+        addedUrisRef.current.add(saved.uri);
+        setPhotos(prev => [...prev, saved]);
+      } else {
+        Alert.alert('Fehler', 'Bild konnte nicht verarbeitet werden.');
+      }
     }
   };
 
   const removePhoto = (index: number) => {
+    const photo = photos[index];
+    if (addedUrisRef.current.has(photo.uri)) {
+      // Neu hinzugefügt → sofort löschen
+      deletePhoto(photo.uri).catch(console.warn);
+      addedUrisRef.current.delete(photo.uri);
+    } else {
+      // Bestehendes Foto → erst beim Speichern löschen
+      pendingDeletesRef.current.push(photo);
+    }
     setPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSave = async () => {
     if (!name.trim()) { setError('Bitte einen Routennamen eingeben.'); return; }
     setError('');
+
+    // Refs leeren bevor goBack() triggert, damit beforeRemove-Handler nichts löscht
+    addedUrisRef.current.clear();
+    const toDelete = pendingDeletesRef.current.splice(0);
 
     const entry: ClimbRoute = {
       id:             existingIdRef.current ?? `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -216,6 +230,10 @@ export function AddRouteScreen({ route, navigation }: Props) {
 
     if (isEditing) { await updateRoute(entry); }
     else           { await saveRoute(entry); }
+
+    // Entfernte Fotos jetzt von Disk löschen
+    if (toDelete.length) Promise.all(toDelete.map(p => deletePhoto(p.uri))).catch(console.warn);
+
     navigation.goBack();
   };
 
@@ -383,11 +401,8 @@ export function AddRouteScreen({ route, navigation }: Props) {
         {photos.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbRow}>
             {photos.map((photo, i) => (
-              <View key={i} style={styles.thumbWrap}>
-                <Image
-                  source={{ uri: `data:image/jpeg;base64,${photo.data}` }}
-                  style={styles.thumb}
-                />
+              <View key={photo.uri} style={styles.thumbWrap}>
+                <Image source={{ uri: photo.uri }} style={styles.thumb} />
                 <TouchableOpacity style={styles.thumbRemove} onPress={() => removePhoto(i)}>
                   <Ionicons name="close-circle" size={20} color="#EF4444" />
                 </TouchableOpacity>

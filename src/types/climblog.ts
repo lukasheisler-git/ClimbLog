@@ -11,10 +11,10 @@ export type ClimbingStyle =
   | 'Technisch'
   | 'Krimpen';
 
-export interface PhotoItem {
-  data: string;      // base64 JPEG
-  width?: number;    // Pixel nach Komprimierung (800px)
-  height?: number;   // Pixel nach Komprimierung
+export interface ClimbPhoto {
+  uri: string;       // lokaler Dateipfad im DocumentDirectory/photos/
+  width?: number;
+  height?: number;
 }
 
 export interface ClimbRoute {
@@ -30,7 +30,7 @@ export interface ClimbRoute {
   notes?: string;
   wallAngle?: WallAngle;
   climbingStyles?: ClimbingStyle[];
-  photos?: PhotoItem[];
+  photos?: ClimbPhoto[];
   createdAt: number;
 }
 
