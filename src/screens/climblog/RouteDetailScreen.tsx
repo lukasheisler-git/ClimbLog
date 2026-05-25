@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Alert, Dimensions, Image, NativeScrollEvent, NativeSyntheticEvent,
+  Alert, Dimensions, FlatList, Image,
   ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { ClimbLogStackParamList } from '../../navigation/types';
 import { deleteRoute, loadRoutes } from '../../storage/climblogStorage';
-import { ClimbResult, ClimbRoute } from '../../types/climblog';
+import { ClimbResult, ClimbRoute, PhotoItem } from '../../types/climblog';
 
 type Props = NativeStackScreenProps<ClimbLogStackParamList, 'RouteDetail'>;
 
@@ -36,11 +36,25 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function photoHeight(photo: PhotoItem): number {
+  return photo.width && photo.height
+    ? Math.min(SCREEN_W * photo.height / photo.width, SCREEN_W * 1.5)
+    : SCREEN_W * 0.75;
+}
+
 export function RouteDetailScreen({ route, navigation }: Props) {
   const { routeId } = route.params;
   const [climbRoute, setClimbRoute] = useState<ClimbRoute | null>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
-  const scrollRef = useRef<ScrollView>(null);
+
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 });
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: { index: number | null }[] }) => {
+      if (viewableItems.length > 0 && viewableItems[0].index != null) {
+        setPhotoIndex(viewableItems[0].index);
+      }
+    },
+  );
 
   useEffect(() => {
     loadRoutes().then(routes => {
@@ -65,10 +79,18 @@ export function RouteDetailScreen({ route, navigation }: Props) {
     );
   };
 
-  const onPhotoScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W);
-    setPhotoIndex(index);
-  };
+  const renderPhoto = useCallback(({ item }: { item: PhotoItem }) => {
+    const h = photoHeight(item);
+    return (
+      <View style={{ width: SCREEN_W, height: h, overflow: 'hidden' }}>
+        <Image
+          source={{ uri: `data:image/jpeg;base64,${item.data}` }}
+          style={{ width: SCREEN_W, height: h }}
+          resizeMode="contain"
+        />
+      </View>
+    );
+  }, []);
 
   if (!climbRoute) {
     return (
@@ -79,6 +101,7 @@ export function RouteDetailScreen({ route, navigation }: Props) {
   }
 
   const photos = climbRoute.photos ?? [];
+  const galleryH = photos.length > 0 ? photoHeight(photos[photoIndex] ?? photos[0]) : 0;
 
   return (
     <View style={styles.root}>
@@ -98,42 +121,8 @@ export function RouteDetailScreen({ route, navigation }: Props) {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
 
-        {/* Foto-Galerie */}
-        {photos.length > 0 && (
-          <View style={styles.galleryWrap}>
-            <ScrollView
-              ref={scrollRef}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onScroll={onPhotoScroll}
-              scrollEventThrottle={16}
-            >
-              {photos.map((b64, i) => (
-                <Image
-                  key={i}
-                  source={{ uri: `data:image/jpeg;base64,${b64}` }}
-                  style={styles.galleryImage}
-                  resizeMode="cover"
-                />
-              ))}
-            </ScrollView>
-            {photos.length > 1 && (
-              <View style={styles.dots}>
-                {photos.map((_, i) => (
-                  <View
-                    key={i}
-                    style={[styles.dot, i === photoIndex && styles.dotActive]}
-                  />
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-
         {/* Info-Bereich */}
         <View style={styles.infoCard}>
-          {/* Grad + Ergebnis prominent */}
           <View style={styles.gradeRow}>
             <Text style={styles.gradeText}>{climbRoute.grade}</Text>
             <View style={[styles.resultBadge, { backgroundColor: RESULT_COLOR[climbRoute.result] + '22' }]}>
@@ -187,6 +176,40 @@ export function RouteDetailScreen({ route, navigation }: Props) {
           )}
         </View>
 
+        {/* Foto-Galerie */}
+        {photos.length > 0 && (
+          <View style={styles.gallerySection}>
+            <Text style={styles.sectionLabel}>Fotos</Text>
+            <View style={[styles.galleryWrap, { height: galleryH }]}>
+              <FlatList
+                data={photos}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={SCREEN_W}
+                snapToAlignment="start"
+                decelerationRate="fast"
+                keyExtractor={(_, index) => index.toString()}
+                getItemLayout={(_, index) => ({
+                  length: SCREEN_W,
+                  offset: SCREEN_W * index,
+                  index,
+                })}
+                renderItem={renderPhoto}
+                onViewableItemsChanged={onViewableItemsChanged.current}
+                viewabilityConfig={viewabilityConfig.current}
+              />
+              {photos.length > 1 && (
+                <View style={styles.dots}>
+                  {photos.map((_, i) => (
+                    <View key={i} style={[styles.dot, i === photoIndex && styles.dotActive]} />
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
         {/* Löschen */}
         <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
           <Ionicons name="trash-outline" size={18} color="#EF4444" />
@@ -209,11 +232,12 @@ const styles = StyleSheet.create({
 
   content: { paddingBottom: 48 },
 
-  galleryWrap:  { backgroundColor: '#000' },
-  galleryImage: { width: SCREEN_W, height: 220 },
-  dots:         { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 8 },
-  dot:          { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.4)' },
-  dotActive:    { backgroundColor: '#fff', width: 18 },
+  gallerySection: { marginHorizontal: 16, marginTop: 4, marginBottom: 4 },
+  sectionLabel:   { fontSize: 11, fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 8 },
+  galleryWrap:    { borderRadius: 12, overflow: 'hidden', backgroundColor: '#F3F4F6' },
+  dots:           { position: 'absolute', bottom: 8, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  dot:            { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.25)' },
+  dotActive:      { backgroundColor: '#1B4332', width: 18 },
 
   infoCard: { margin: 16, backgroundColor: '#fff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
 

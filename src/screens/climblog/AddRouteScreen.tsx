@@ -12,7 +12,7 @@ import { ClimbLogStackParamList } from '../../navigation/types';
 import { loadRoutes, saveRoute, updateRoute } from '../../storage/climblogStorage';
 import {
   CLIMBING_STYLES, ClimbResult, ClimbRoute, ClimbStyle,
-  ClimbingStyle, GRADES, WALL_ANGLES, WallAngle,
+  ClimbingStyle, GRADES, PhotoItem, WALL_ANGLES, WallAngle,
 } from '../../types/climblog';
 
 type Props = NativeStackScreenProps<ClimbLogStackParamList, 'AddRoute'>;
@@ -72,11 +72,11 @@ export function AddRouteScreen({ route, navigation }: Props) {
   const [grade,          setGrade]          = useState('7a');
   const [style,          setStyle]          = useState<ClimbStyle>('Lead');
   const [result,         setResult]         = useState<ClimbResult>('Redpoint');
-  const [stars,          setStars]          = useState(0);
-  const [notes,          setNotes]          = useState('');
   const [wallAngle,      setWallAngle]      = useState<WallAngle | null>(null);
   const [climbingStyles, setClimbingStyles] = useState<ClimbingStyle[]>([]);
-  const [photos,         setPhotos]         = useState<string[]>([]);
+  const [stars,          setStars]          = useState(0);
+  const [notes,          setNotes]          = useState('');
+  const [photos,         setPhotos]         = useState<PhotoItem[]>([]);
   const [error,          setError]          = useState('');
   const [isLoaded,       setIsLoaded]       = useState(!isEditing);
 
@@ -98,10 +98,10 @@ export function AddRouteScreen({ route, navigation }: Props) {
       setGrade(found.grade);
       setStyle(found.style);
       setResult(found.result);
-      setStars(found.stars ?? 0);
-      setNotes(found.notes ?? '');
       setWallAngle(found.wallAngle ?? null);
       setClimbingStyles(found.climbingStyles ?? []);
+      setStars(found.stars ?? 0);
+      setNotes(found.notes ?? '');
       setPhotos(found.photos ?? []);
       setIsLoaded(true);
     });
@@ -122,9 +122,28 @@ export function AddRouteScreen({ route, navigation }: Props) {
     );
   };
 
+  // Komprimiert ein Asset und gibt ein PhotoItem zurück (oder null bei Fehler)
+  const processAsset = async (asset: ImagePicker.ImagePickerAsset): Promise<PhotoItem | null> => {
+    try {
+      const manipulated = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: { width: 800 } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+      );
+      if (!manipulated.base64) return null;
+      const origW = asset.width  ?? 800;
+      const origH = asset.height ?? 600;
+      const scaledH = Math.round(800 * origH / origW);
+      return { data: manipulated.base64, width: 800, height: scaledH };
+    } catch {
+      return null;
+    }
+  };
+
   const pickFromLibrary = async () => {
-    if (photos.length >= MAX_PHOTOS) {
-      Alert.alert('Maximum erreicht', `Maximal ${MAX_PHOTOS} Fotos pro Route.`);
+    const remaining = MAX_PHOTOS - photos.length;
+    if (remaining <= 0) {
+      Alert.alert('Maximum erreicht', `Maximal ${MAX_PHOTOS} Fotos pro Route möglich.`);
       return;
     }
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -132,19 +151,26 @@ export function AddRouteScreen({ route, navigation }: Props) {
       Alert.alert('Berechtigung fehlt', 'Zugriff auf die Galerie wurde verweigert.');
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
+    const pickerResult = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
+      allowsMultipleSelection: true,
+      allowsEditing: false,
       quality: 1,
     });
-    if (!result.canceled && result.assets[0]) {
-      await compressAndAdd(result.assets[0].uri);
+    if (pickerResult.canceled) return;
+
+    const selected = pickerResult.assets.slice(0, remaining);
+    if (pickerResult.assets.length > remaining) {
+      Alert.alert('Limit erreicht', `Es wurden nur ${remaining} von ${pickerResult.assets.length} Fotos hinzugefügt (Maximum ${MAX_PHOTOS}).`);
     }
+
+    const processed = (await Promise.all(selected.map(processAsset))).filter((p): p is PhotoItem => p !== null);
+    if (processed.length > 0) setPhotos(prev => [...prev, ...processed]);
   };
 
   const pickFromCamera = async () => {
     if (photos.length >= MAX_PHOTOS) {
-      Alert.alert('Maximum erreicht', `Maximal ${MAX_PHOTOS} Fotos pro Route.`);
+      Alert.alert('Maximum erreicht', `Maximal ${MAX_PHOTOS} Fotos pro Route möglich.`);
       return;
     }
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -152,27 +178,14 @@ export function AddRouteScreen({ route, navigation }: Props) {
       Alert.alert('Berechtigung fehlt', 'Zugriff auf die Kamera wurde verweigert.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
+    const pickerResult = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
       quality: 1,
     });
-    if (!result.canceled && result.assets[0]) {
-      await compressAndAdd(result.assets[0].uri);
-    }
-  };
-
-  const compressAndAdd = async (uri: string) => {
-    try {
-      const manipulated = await ImageManipulator.manipulateAsync(
-        uri,
-        [{ resize: { width: 800 } }],
-        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true },
-      );
-      if (manipulated.base64) {
-        setPhotos(prev => [...prev, manipulated.base64!]);
-      }
-    } catch {
-      Alert.alert('Fehler', 'Bild konnte nicht verarbeitet werden.');
+    if (!pickerResult.canceled && pickerResult.assets[0]) {
+      const item = await processAsset(pickerResult.assets[0]);
+      if (item) setPhotos(prev => [...prev, item]);
+      else Alert.alert('Fehler', 'Bild konnte nicht verarbeitet werden.');
     }
   };
 
@@ -185,27 +198,24 @@ export function AddRouteScreen({ route, navigation }: Props) {
     setError('');
 
     const entry: ClimbRoute = {
-      id:            existingIdRef.current ?? `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-      name:          name.trim(),
-      area:          area.trim()   || undefined,
-      sector:        sector.trim() || undefined,
-      date:          date.toISOString(),
+      id:             existingIdRef.current ?? `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      name:           name.trim(),
+      area:           area.trim()   || undefined,
+      sector:         sector.trim() || undefined,
+      date:           date.toISOString(),
       grade,
       style,
       result,
-      stars:         stars || undefined,
-      notes:         notes.trim() || undefined,
-      wallAngle:     wallAngle ?? undefined,
+      wallAngle:      wallAngle ?? undefined,
       climbingStyles: climbingStyles.length > 0 ? climbingStyles : undefined,
-      photos:        photos.length > 0 ? photos : undefined,
-      createdAt:     existingAtRef.current,
+      stars:          stars || undefined,
+      notes:          notes.trim() || undefined,
+      photos:         photos.length > 0 ? photos : undefined,
+      createdAt:      existingAtRef.current,
     };
 
-    if (isEditing) {
-      await updateRoute(entry);
-    } else {
-      await saveRoute(entry);
-    }
+    if (isEditing) { await updateRoute(entry); }
+    else           { await saveRoute(entry); }
     navigation.goBack();
   };
 
@@ -310,23 +320,6 @@ export function AddRouteScreen({ route, navigation }: Props) {
         <FieldLabel text="Ergebnis" />
         <ToggleRow options={RESULTS} value={result} onChange={v => setResult(v as ClimbResult)} />
 
-        {/* Bewertung */}
-        <FieldLabel text="Bewertung" />
-        <StarRow value={stars} onChange={setStars} />
-
-        {/* Notizen */}
-        <FieldLabel text="Notizen" />
-        <TextInput
-          style={[styles.input, styles.notesInput]}
-          value={notes}
-          onChangeText={setNotes}
-          placeholder="Beobachtungen, Beta, Wetter…"
-          placeholderTextColor="#9CA3AF"
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-        />
-
         {/* Wandneigung */}
         <FieldLabel text="Wandneigung" />
         <View style={styles.toggleRow}>
@@ -358,6 +351,23 @@ export function AddRouteScreen({ route, navigation }: Props) {
           })}
         </View>
 
+        {/* Bewertung */}
+        <FieldLabel text="Bewertung" />
+        <StarRow value={stars} onChange={setStars} />
+
+        {/* Notizen */}
+        <FieldLabel text="Notizen" />
+        <TextInput
+          style={[styles.input, styles.notesInput]}
+          value={notes}
+          onChangeText={setNotes}
+          placeholder="Beobachtungen, Beta, Wetter…"
+          placeholderTextColor="#9CA3AF"
+          multiline
+          numberOfLines={4}
+          textAlignVertical="top"
+        />
+
         {/* Fotos */}
         <FieldLabel text={`Fotos (${photos.length}/${MAX_PHOTOS})`} />
         <View style={styles.photoButtons}>
@@ -372,10 +382,10 @@ export function AddRouteScreen({ route, navigation }: Props) {
         </View>
         {photos.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbRow}>
-            {photos.map((b64, i) => (
+            {photos.map((photo, i) => (
               <View key={i} style={styles.thumbWrap}>
                 <Image
-                  source={{ uri: `data:image/jpeg;base64,${b64}` }}
+                  source={{ uri: `data:image/jpeg;base64,${photo.data}` }}
                   style={styles.thumb}
                 />
                 <TouchableOpacity style={styles.thumbRemove} onPress={() => removePhoto(i)}>

@@ -9,8 +9,11 @@ export async function loadRoutes(): Promise<ClimbRoute[]> {
   const routes: ClimbRoute[] = JSON.parse(raw);
   return routes.map(r => ({
     climbingStyles: [],
-    photos: [],
     ...r,
+    // Migrate: photos stored as bare base64 strings → PhotoItem
+    photos: ((r.photos ?? []) as any[]).map((p: any) =>
+      typeof p === 'string' ? { data: p } : p,
+    ),
   }));
 }
 
