@@ -1,11 +1,11 @@
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ClimbResult, ClimbRoute } from '../../types/climblog';
 
 interface Props {
   route: ClimbRoute;
-  onEdit?: () => void;
-  onDelete?: () => void;
+  onPress: () => void;
 }
 
 const RESULT_COLOR: Record<ClimbResult, string> = {
@@ -19,22 +19,11 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-export function RouteCard({ route, onEdit, onDelete }: Props) {
-  const handleLongPress = () => {
-    if (!onEdit && !onDelete) return;
-    Alert.alert(route.name, undefined, [
-      ...(onEdit   ? [{ text: 'Bearbeiten', onPress: onEdit }] : []),
-      ...(onDelete ? [{ text: 'Löschen', style: 'destructive' as const, onPress: onDelete }] : []),
-      { text: 'Abbrechen', style: 'cancel' as const },
-    ]);
-  };
+export function RouteCard({ route, onPress }: Props) {
+  const hasPhotos = (route.photos?.length ?? 0) > 0;
 
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onLongPress={handleLongPress}
-      activeOpacity={0.85}
-    >
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.top}>
         <View style={styles.left}>
           <Text style={styles.name} numberOfLines={1}>{route.name}</Text>
@@ -54,6 +43,10 @@ export function RouteCard({ route, onEdit, onDelete }: Props) {
         <Text style={styles.meta}>{route.style}</Text>
         {!!route.stars && (
           <Text style={styles.stars}>{'★'.repeat(route.stars)}</Text>
+        )}
+        <View style={{ flex: 1 }} />
+        {hasPhotos && (
+          <Ionicons name="camera-outline" size={14} color="#9CA3AF" />
         )}
       </View>
     </TouchableOpacity>

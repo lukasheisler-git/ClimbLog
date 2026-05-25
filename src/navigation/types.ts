@@ -11,6 +11,7 @@ export type ClimbLogTabKey = 'Begehungen' | 'Suche' | 'Statistik';
 export type ClimbLogStackParamList = {
   ClimbLogMain: { initialTab?: ClimbLogTabKey };
   AddRoute:     { routeId?: string };
+  RouteDetail:  { routeId: string };
 };
 
 export type TrainingStackParamList = {
