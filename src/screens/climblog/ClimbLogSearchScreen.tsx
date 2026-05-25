@@ -8,7 +8,7 @@ import {
 import { RouteCard } from '../../components/climblog/RouteCard';
 import { DEFAULT_FILTER, FilterState, SortOrder, applyFilter, gradeIndex } from '../../hooks/useClimbLog';
 import { ClimbLogStackParamList } from '../../navigation/types';
-import { deleteRoute, loadRoutes } from '../../storage/climblogStorage';
+import { loadRoutes } from '../../storage/climblogStorage';
 import { ClimbResult, ClimbRoute, ClimbStyle, GRADES } from '../../types/climblog';
 
 interface Props {
@@ -120,18 +120,12 @@ export function ClimbLogSearchScreen({ navigation, reloadKey }: Props) {
 
   const results = useMemo(() => applyFilter(allRoutes, filter), [allRoutes, filter]);
 
-  const handleDelete = useCallback((id: string) => {
-    deleteRoute(id);
-    setAllRoutes(prev => prev.filter(r => r.id !== id));
-  }, []);
-
   const renderItem = useCallback(({ item }: { item: ClimbRoute }) => (
     <RouteCard
       route={item}
-      onEdit={() => navigation.navigate('AddRoute', { routeId: item.id })}
-      onDelete={() => handleDelete(item.id)}
+      onPress={() => navigation.navigate('RouteDetail', { routeId: item.id })}
     />
-  ), [navigation, handleDelete]);
+  ), [navigation]);
 
   return (
     <View style={styles.root}>

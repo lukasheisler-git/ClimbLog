@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { RouteCard } from '../../components/climblog/RouteCard';
 import { ClimbLogStackParamList } from '../../navigation/types';
-import { deleteRoute, loadRoutes } from '../../storage/climblogStorage';
+import { loadRoutes } from '../../storage/climblogStorage';
 import { ClimbRoute } from '../../types/climblog';
 
 interface Props {
@@ -18,11 +18,6 @@ export function ClimbLogHomeScreen({ navigation, reloadKey }: Props) {
     loadRoutes().then(setRoutes);
   }, [reloadKey]);
 
-  const handleDelete = (id: string) => {
-    deleteRoute(id);
-    setRoutes(prev => prev.filter(r => r.id !== id));
-  };
-
   return (
     <FlatList
       data={routes}
@@ -30,8 +25,7 @@ export function ClimbLogHomeScreen({ navigation, reloadKey }: Props) {
       renderItem={({ item }) => (
         <RouteCard
           route={item}
-          onEdit={() => navigation.navigate('AddRoute', { routeId: item.id })}
-          onDelete={() => handleDelete(item.id)}
+          onPress={() => navigation.navigate('RouteDetail', { routeId: item.id })}
         />
       )}
       contentContainerStyle={styles.list}

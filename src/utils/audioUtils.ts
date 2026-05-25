@@ -1,5 +1,5 @@
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 
 // Erzeugt eine WAV-Datei als Base64-String (8-Bit PCM, Mono, 8000 Hz).
