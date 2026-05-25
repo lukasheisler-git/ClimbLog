@@ -24,7 +24,12 @@ export function WorkoutCard({ workout, onStart, onLongPress }: Props) {
   return (
     <TouchableOpacity style={styles.card} onPress={onStart} onLongPress={onLongPress} activeOpacity={0.8}>
       <View style={styles.info}>
-        <Text style={styles.name}>{workout.name}</Text>
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>{workout.name}</Text>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{workout.category}</Text>
+          </View>
+        </View>
         <Text style={styles.meta}>
           {workout.sets.length} {workout.sets.length === 1 ? 'Satz' : 'Sätze'} · {estimateDuration(workout)}
         </Text>
@@ -51,7 +56,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   info:      { flex: 1 },
+  nameRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   name:      { fontSize: 16, fontWeight: '700', color: '#111827' },
+  badge:     { backgroundColor: '#FEE2E2', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2 },
+  badgeText: { fontSize: 10, fontWeight: '600', color: '#B91C1C' },
   meta:      { fontSize: 13, color: '#6B7280', marginTop: 2 },
   startBtn:  { width: 40, height: 40, borderRadius: 20, backgroundColor: '#1B4332', alignItems: 'center', justifyContent: 'center' },
   startText: { color: '#fff', fontSize: 14, marginLeft: 2 },
