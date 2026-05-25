@@ -1,60 +1,64 @@
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 
-// Erzeugt eine WAV-Datei als Base64-String (8-Bit PCM, Mono, 8000 Hz).
-function generateWavBase64(frequencyHz: number, durationMs: number): string {
-  const sampleRate = 8000;
-  const numSamples = Math.floor(sampleRate * durationMs / 1000);
-  const buffer = new ArrayBuffer(44 + numSamples);
-  const v = new DataView(buffer);
+// ─── WAV Generation ───────────────────────────────────────────────────────────
 
-  const str = (off: number, s: string) => {
-    for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i));
-  };
+const SR = 8000; // 8-bit PCM, mono, 8000 Hz
 
-  str(0, 'RIFF');
-  v.setUint32(4, 36 + numSamples, true);
-  str(8, 'WAVE');
-  str(12, 'fmt ');
-  v.setUint32(16, 16, true);
-  v.setUint16(20, 1, true);       // PCM
-  v.setUint16(22, 1, true);       // Mono
-  v.setUint32(24, sampleRate, true);
-  v.setUint32(28, sampleRate, true);
-  v.setUint16(32, 1, true);
-  v.setUint16(34, 8, true);       // 8-bit
-  str(36, 'data');
-  v.setUint32(40, numSamples, true);
+function writeWavHeader(v: DataView, numSamples: number): void {
+  const w = (off: number, s: string) => { for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + numSamples, true);
+  w(8, 'WAVE'); w(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, SR, true); v.setUint32(28, SR, true);
+  v.setUint16(32, 1, true);  v.setUint16(34, 8, true);
+  w(36, 'data'); v.setUint32(40, numSamples, true);
+}
 
-  const fadeIn  = Math.min(60, Math.floor(numSamples * 0.05));
-  const fadeOut = Math.min(120, Math.floor(numSamples * 0.1));
-
-  for (let i = 0; i < numSamples; i++) {
-    const t = i / sampleRate;
+function writeTone(v: DataView, offset: number, n: number, hz: number): void {
+  const fadeIn  = Math.min(40, Math.floor(n * 0.05));
+  const fadeOut = Math.min(80, Math.floor(n * 0.10));
+  for (let i = 0; i < n; i++) {
     let amp = 0.75;
-    if (i < fadeIn)  amp *= i / fadeIn;
-    if (i > numSamples - fadeOut) amp *= (numSamples - i) / fadeOut;
-    const sample = Math.sin(2 * Math.PI * frequencyHz * t) * amp;
-    v.setUint8(44 + i, Math.round(128 + sample * 100));
+    if (i < fadeIn)       amp *= i / fadeIn;
+    if (i > n - fadeOut)  amp *= (n - i) / fadeOut;
+    v.setUint8(offset + i, Math.round(128 + Math.sin(2 * Math.PI * hz * (i / SR)) * amp * 100));
   }
+}
 
-  const bytes = new Uint8Array(buffer);
+// Double beep: 2× 330 Hz (80 ms tone · 50 ms silence · 80 ms tone)
+function generateDoubleBeep(): string {
+  const tone    = Math.floor(SR * 0.08);  // 640 samples
+  const silence = Math.floor(SR * 0.05);  // 400 samples
+  const total   = tone * 2 + silence;
+  const v = new DataView(new ArrayBuffer(44 + total));
+  writeWavHeader(v, total);
+  writeTone(v, 44, tone, 330);
+  for (let i = 0; i < silence; i++) v.setUint8(44 + tone + i, 128);
+  writeTone(v, 44 + tone + silence, tone, 330);
+  return arrayBufferToBase64(v.buffer);
+}
+
+// Single tone: 660 Hz, 400 ms
+function generateSingleBeep(): string {
+  const total = Math.floor(SR * 0.4);  // 3200 samples
+  const v = new DataView(new ArrayBuffer(44 + total));
+  writeWavHeader(v, total);
+  writeTone(v, 44, total, 660);
+  return arrayBufferToBase64(v.buffer);
+}
+
+function arrayBufferToBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
   let bin = '';
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
   return btoa(bin);
 }
 
-// ─── Sound-Objekte ────────────────────────────────────────────────────────────
-// hangCountdown:  kurzer hoher Beep beim Countdown im Hängen (2s, 1s)
-// pauseCountdown: kurzer tiefer Beep beim Countdown in der Pause (2s, 1s)
-// hangEnd:        mittellanger Beep → Hängen endet, Pause beginnt
-// pauseEnd:       längerer Beep   → Pause endet, Hängen beginnt (oder Abschluss)
+// ─── Sound Objects ────────────────────────────────────────────────────────────
 
-let _hangCountdown:  Audio.Sound | null = null;
-let _pauseCountdown: Audio.Sound | null = null;
-let _hangEnd:        Audio.Sound | null = null;
-let _pauseEnd:       Audio.Sound | null = null;
+let _soundDouble:     Audio.Sound | null = null;
+let _soundTransition: Audio.Sound | null = null;
 let _ready = false;
 
 export async function initBeeps(): Promise<void> {
@@ -62,35 +66,13 @@ export async function initBeeps(): Promise<void> {
   try {
     await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, shouldDuckAndroid: true });
 
-    const hangCdB64  = generateWavBase64(880, 80);   // kurz hoch
-    const pauseCdB64 = generateWavBase64(440, 80);   // kurz tief
-    const hangEndB64 = generateWavBase64(880, 200);  // mittel hoch
-    const pauseEndB64 = generateWavBase64(440, 400); // lang tief
-
-    const base = FileSystem.cacheDirectory!;
-    const uriHangCd   = base + 'cl_hang_cd.wav';
-    const uriPauseCd  = base + 'cl_pause_cd.wav';
-    const uriHangEnd  = base + 'cl_hang_end.wav';
-    const uriPauseEnd = base + 'cl_pause_end.wav';
-
-    await Promise.all([
-      FileSystem.writeAsStringAsync(uriHangCd,   hangCdB64,   { encoding: FileSystem.EncodingType.Base64 }),
-      FileSystem.writeAsStringAsync(uriPauseCd,  pauseCdB64,  { encoding: FileSystem.EncodingType.Base64 }),
-      FileSystem.writeAsStringAsync(uriHangEnd,  hangEndB64,  { encoding: FileSystem.EncodingType.Base64 }),
-      FileSystem.writeAsStringAsync(uriPauseEnd, pauseEndB64, { encoding: FileSystem.EncodingType.Base64 }),
+    const [{ sound: d }, { sound: t }] = await Promise.all([
+      Audio.Sound.createAsync({ uri: 'data:audio/wav;base64,' + generateDoubleBeep() }),
+      Audio.Sound.createAsync({ uri: 'data:audio/wav;base64,' + generateSingleBeep() }),
     ]);
 
-    const [{ sound: hc }, { sound: pc }, { sound: he }, { sound: pe }] = await Promise.all([
-      Audio.Sound.createAsync({ uri: uriHangCd }),
-      Audio.Sound.createAsync({ uri: uriPauseCd }),
-      Audio.Sound.createAsync({ uri: uriHangEnd }),
-      Audio.Sound.createAsync({ uri: uriPauseEnd }),
-    ]);
-
-    _hangCountdown  = hc;
-    _pauseCountdown = pc;
-    _hangEnd        = he;
-    _pauseEnd       = pe;
+    _soundDouble     = d;
+    _soundTransition = t;
     _ready = true;
   } catch (e) {
     console.warn('Audio-Init fehlgeschlagen, Fallback auf Haptics:', e);
@@ -99,27 +81,32 @@ export async function initBeeps(): Promise<void> {
 
 export async function unloadBeeps(): Promise<void> {
   await Promise.all([
-    _hangCountdown?.unloadAsync(),
-    _pauseCountdown?.unloadAsync(),
-    _hangEnd?.unloadAsync(),
-    _pauseEnd?.unloadAsync(),
+    _soundDouble?.unloadAsync(),
+    _soundTransition?.unloadAsync(),
   ]);
-  _hangCountdown = _pauseCountdown = _hangEnd = _pauseEnd = null;
+  _soundDouble = _soundTransition = null;
   _ready = false;
 }
 
-function play(sound: Audio.Sound | null, hapticFallback: () => void): void {
+async function play(sound: Audio.Sound | null, haptic: () => void): Promise<void> {
   if (sound) {
-    sound.replayAsync().catch(hapticFallback);
+    try {
+      await sound.setPositionAsync(0);
+      await sound.playAsync();
+    } catch {
+      haptic();
+    }
   } else {
-    hapticFallback();
+    haptic();
   }
 }
 
-// Countdown-Beeps (2s, 1s verbleibend) —  kurze Pieptöne
-export function playHangCountdownBeep():  void { play(_hangCountdown,  () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)); }
-export function playPauseCountdownBeep(): void { play(_pauseCountdown, () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)); }
+// 2s / 1s verbleibend (Hängen oder Pause)
+export function playDouble(): void {
+  play(_soundDouble, () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
+}
 
-// Phasenende-Töne
-export function playHangEndBeep():  void { play(_hangEnd,  () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)); }
-export function playPauseEndBeep(): void { play(_pauseEnd, () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)); }
+// 0s / Phasenübergang
+export function playTransition(): void {
+  play(_soundTransition, () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
+}

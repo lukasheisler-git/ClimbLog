@@ -5,7 +5,9 @@ import { CountdownCircle } from '../../components/hangboard/CountdownCircle';
 import { useHangboardTimer } from '../../hooks/useHangboardTimer';
 import { HangboardStackParamList } from '../../navigation/types';
 import { loadWorkouts, saveSession } from '../../storage/hangboardStorage';
+import { saveSession as saveTrainingSession } from '../../storage/trainingStorage';
 import { HangboardSession, HangboardWorkout } from '../../types/hangboard';
+import { TrainingSession } from '../../types/training';
 import { initBeeps, unloadBeeps } from '../../utils/audioUtils';
 
 type Props = NativeStackScreenProps<HangboardStackParamList, 'Timer'>;
@@ -53,9 +55,12 @@ export function TimerScreen({ route, navigation }: Props) {
     if (timer.phase !== 'complete' || !workout || sessionSavedRef.current) return;
     sessionSavedRef.current = true;
 
-    const session: HangboardSession = {
-      id:            Date.now().toString(),
-      date:          new Date().toISOString(),
+    const now = new Date().toISOString();
+    const ts  = Date.now();
+
+    const hangSession: HangboardSession = {
+      id:            ts.toString(),
+      date:          now,
       workoutId:     workout.id,
       workoutName:   workout.name,
       completedSets: workout.sets.map((s, i) => ({
@@ -68,9 +73,31 @@ export function TimerScreen({ route, navigation }: Props) {
         hangDuration:  s.hangDuration,
       })),
       totalDuration: timer.elapsedSeconds,
-      createdAt:     Date.now(),
+      createdAt:     ts,
     };
-    saveSession(session).catch(console.warn);
+
+    const durationSec = workout.sets.reduce((sum, set, i) => {
+      const reps = timer.completedRepsPerSet[i] ?? 0;
+      if (reps === 0) return sum;
+      return sum + set.hangDuration * reps + set.restDuration * (reps - 1) + set.setRest;
+    }, 0);
+
+    const trainingSession: TrainingSession = {
+      id:         `${ts}_hb`,
+      name:       workout.name,
+      category:   'Strength & Power',
+      date:       now,
+      duration:   Math.max(1, Math.round(durationSec / 60)),
+      intensity:  5,
+      notes:      'Hangboard-Session (automatisch)',
+      exercises:  [],
+      isTemplate: false,
+    };
+
+    Promise.all([
+      saveSession(hangSession),
+      saveTrainingSession(trainingSession),
+    ]).catch(console.warn);
   }, [timer.phase]);
 
   // Zurück-Navigation während laufendem Timer abfangen
