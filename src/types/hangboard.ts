@@ -1,5 +1,6 @@
 export type GripDepth = '45mm' | '30mm' | '20mm' | '15mm';
 export type GripType = 'Half Crimp' | 'Full Crimp' | 'Open Hand';
+export type HangboardCategory = 'Endurance' | 'Power Endurance' | 'Strength & Power';
 
 export interface HangboardSet {
   id: string;
@@ -15,6 +16,7 @@ export interface HangboardSet {
 export interface HangboardWorkout {
   id: string;
   name: string;
+  category: HangboardCategory;
   sets: HangboardSet[];
   createdAt: number;
   updatedAt: number;

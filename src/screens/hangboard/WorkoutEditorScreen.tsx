@@ -6,7 +6,9 @@ import {
 } from 'react-native';
 import { HangboardStackParamList } from '../../navigation/types';
 import { loadWorkouts, saveWorkout } from '../../storage/hangboardStorage';
-import { GripDepth, GripType, HangboardSet, HangboardWorkout } from '../../types/hangboard';
+import { GripDepth, GripType, HangboardCategory, HangboardSet, HangboardWorkout } from '../../types/hangboard';
+
+const CATEGORIES: HangboardCategory[] = ['Endurance', 'Power Endurance', 'Strength & Power'];
 
 type Props = NativeStackScreenProps<HangboardStackParamList, 'WorkoutEditor'>;
 
@@ -117,15 +119,15 @@ export function WorkoutEditorScreen({ route, navigation }: Props) {
   const { workoutId } = route.params ?? {};
   const isEditing = !!workoutId;
 
-  const [name, setName] = useState('');
-  const [sets, setSets] = useState<HangboardSet[]>([makeSet()]);
+  const [name,     setName]     = useState('');
+  const [category, setCategory] = useState<HangboardCategory>('Strength & Power');
+  const [sets,     setSets]     = useState<HangboardSet[]>([makeSet()]);
 
-  // Bestehendes Workout laden wenn workoutId vorhanden
   useEffect(() => {
     if (!workoutId) return;
     loadWorkouts().then(ws => {
       const found = ws.find(w => w.id === workoutId);
-      if (found) { setName(found.name); setSets(found.sets); }
+      if (found) { setName(found.name); setCategory(found.category); setSets(found.sets); }
     });
   }, [workoutId]);
 
@@ -148,8 +150,9 @@ export function WorkoutEditorScreen({ route, navigation }: Props) {
     const workout: HangboardWorkout = {
       id:        workoutId ?? now.toString(),
       name:      name.trim(),
+      category,
       sets,
-      createdAt: workoutId ? now : now, // Bei Edit: createdAt bleibt unverändert (wird beim Laden überschrieben)
+      createdAt: now,
       updatedAt: now,
     };
 
@@ -178,6 +181,20 @@ export function WorkoutEditorScreen({ route, navigation }: Props) {
           placeholderTextColor="#9CA3AF"
           returnKeyType="done"
         />
+
+        {/* Kategorie */}
+        <Text style={styles.fieldLabel}>Kategorie</Text>
+        <View style={styles.optionRow}>
+          {CATEGORIES.map(cat => (
+            <TouchableOpacity
+              key={cat}
+              style={[styles.optionBtn, category === cat && styles.optionBtnActive]}
+              onPress={() => setCategory(cat)}
+            >
+              <Text style={[styles.optionText, category === cat && styles.optionTextActive]}>{cat}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {/* Sätze */}
         <Text style={[styles.fieldLabel, { marginTop: 20 }]}>Sätze</Text>

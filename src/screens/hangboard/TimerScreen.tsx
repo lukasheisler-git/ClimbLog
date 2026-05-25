@@ -85,7 +85,7 @@ export function TimerScreen({ route, navigation }: Props) {
     const trainingSession: TrainingSession = {
       id:         `${ts}_hb`,
       name:       workout.name,
-      category:   'Strength & Power',
+      category:   workout.category,
       date:       now,
       duration:   Math.max(1, Math.round(durationSec / 60)),
       intensity:  5,

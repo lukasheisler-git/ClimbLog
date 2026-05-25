@@ -6,7 +6,9 @@ const SESSIONS_KEY = '@climblog:hangboard_sessions';
 
 export async function loadWorkouts(): Promise<HangboardWorkout[]> {
   const raw = await AsyncStorage.getItem(WORKOUTS_KEY);
-  return raw ? JSON.parse(raw) : [];
+  if (!raw) return [];
+  const workouts: HangboardWorkout[] = JSON.parse(raw);
+  return workouts.map(w => w.category ? w : { ...w, category: 'Strength & Power' });
 }
 
 export async function saveWorkout(workout: HangboardWorkout): Promise<void> {
