@@ -1,9 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
-import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Alert, FlatList, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { TemplatePickerModal } from '../../components/training/TemplatePickerModal';
 import { TrainingStackParamList } from '../../navigation/types';
 import { loadPlans } from '../../storage/planStorage';
@@ -19,6 +17,13 @@ function badgeColor(category: string): string {
   return (CATEGORY_COLOR as Record<string, string>)[category] ?? '#6B7280';
 }
 
+function moveItem<T>(arr: T[], from: number, to: number): T[] {
+  const next = [...arr];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
 export function DayEditorScreen({ route, navigation }: Props) {
   const { weekday } = route.params;
   const { activePlan, reload: reloadPlan, updateWeekday } = useTrainingPlan();
@@ -27,7 +32,6 @@ export function DayEditorScreen({ route, navigation }: Props) {
   const [units,     setUnits]     = useState<PlannedUnit[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  // Load initial state from active plan
   useEffect(() => {
     loadPlans().then(plans => {
       const plan = plans.find(p => p.isActive) ?? plans[0];
@@ -36,7 +40,6 @@ export function DayEditorScreen({ route, navigation }: Props) {
     });
   }, [weekday]);
 
-  // Also keep in sync when reloadPlan triggers
   useEffect(() => {
     if (!activePlan) return;
     const day = activePlan.weekdays.find(d => d.weekday === weekday);
@@ -66,34 +69,52 @@ export function DayEditorScreen({ route, navigation }: Props) {
     ]);
   };
 
-  const renderItem = useCallback(({ item, drag, isActive }: RenderItemParams<PlannedUnit>) => {
+  const handleMove = (index: number, direction: -1 | 1) => {
+    const next = moveItem(units, index, index + direction);
+    setUnits(next.map((u, i) => ({ ...u, order: i })));
+  };
+
+  const renderItem = useCallback(({ item, index }: { item: PlannedUnit; index: number }) => {
     const color = badgeColor(item.category);
     return (
-      <ScaleDecorator>
-        <View style={[styles.unitCard, isActive && styles.unitCardActive]}>
-          <Ionicons
-            name={item.type === 'hangboard' ? 'finger-print-outline' : 'barbell-outline'}
-            size={18} color="#6B7280" style={styles.unitIcon}
-          />
-          <View style={styles.unitInfo}>
-            <Text style={styles.unitName}>{item.templateName}</Text>
-            <View style={[styles.badge, { backgroundColor: color + '22' }]}>
-              <Text style={[styles.badgeText, { color }]}>{item.category}</Text>
-            </View>
+      <View style={styles.unitCard}>
+        <Ionicons
+          name={item.type === 'hangboard' ? 'finger-print-outline' : 'barbell-outline'}
+          size={18} color="#6B7280" style={styles.unitIcon}
+        />
+        <View style={styles.unitInfo}>
+          <Text style={styles.unitName}>{item.templateName}</Text>
+          <View style={[styles.badge, { backgroundColor: color + '22' }]}>
+            <Text style={[styles.badgeText, { color }]}>{item.category}</Text>
           </View>
-          <TouchableOpacity onPress={() => handleDeleteUnit(item.id)} hitSlop={6} style={styles.unitAction}>
-            <Ionicons name="trash-outline" size={16} color="#EF4444" />
+        </View>
+        <View style={styles.reorderBtns}>
+          <TouchableOpacity
+            onPress={() => handleMove(index, -1)}
+            disabled={index === 0}
+            hitSlop={4}
+            style={styles.reorderBtn}
+          >
+            <Ionicons name="chevron-up-outline" size={18} color={index === 0 ? '#D1D5DB' : '#6B7280'} />
           </TouchableOpacity>
-          <TouchableOpacity onLongPress={drag} delayLongPress={150} hitSlop={6} style={styles.unitAction}>
-            <Ionicons name="reorder-three-outline" size={20} color="#9CA3AF" />
+          <TouchableOpacity
+            onPress={() => handleMove(index, 1)}
+            disabled={index === units.length - 1}
+            hitSlop={4}
+            style={styles.reorderBtn}
+          >
+            <Ionicons name="chevron-down-outline" size={18} color={index === units.length - 1 ? '#D1D5DB' : '#6B7280'} />
           </TouchableOpacity>
         </View>
-      </ScaleDecorator>
+        <TouchableOpacity onPress={() => handleDeleteUnit(item.id)} hitSlop={6} style={styles.unitAction}>
+          <Ionicons name="trash-outline" size={16} color="#EF4444" />
+        </TouchableOpacity>
+      </View>
     );
-  }, []);
+  }, [units]);
 
   return (
-    <GestureHandlerRootView style={styles.root}>
+    <View style={styles.root}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
@@ -119,10 +140,9 @@ export function DayEditorScreen({ route, navigation }: Props) {
       {/* Unit List */}
       {!isRestDay && (
         <>
-          <DraggableFlatList
+          <FlatList
             data={units}
             keyExtractor={u => u.id}
-            onDragEnd={({ data }) => setUnits(data.map((u, i) => ({ ...u, order: i })))}
             renderItem={renderItem}
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
@@ -142,7 +162,7 @@ export function DayEditorScreen({ route, navigation }: Props) {
         onClose={() => setPickerOpen(false)}
         onSelect={handleAddUnit}
       />
-    </GestureHandlerRootView>
+    </View>
   );
 }
 
@@ -162,13 +182,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 8,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1,
   },
-  unitCardActive: { opacity: 0.9, shadowOpacity: 0.15, elevation: 4 },
   unitIcon:   { marginRight: 10 },
   unitInfo:   { flex: 1, gap: 4 },
   unitName:   { fontSize: 14, fontWeight: '600', color: '#111827' },
   badge:      { alignSelf: 'flex-start', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
   badgeText:  { fontSize: 10, fontWeight: '600' },
   unitAction: { padding: 4, marginLeft: 4 },
+
+  reorderBtns: { flexDirection: 'column', gap: 0, marginRight: 2 },
+  reorderBtn:  { padding: 2 },
 
   empty:  { fontSize: 13, color: '#9CA3AF', textAlign: 'center', paddingVertical: 24, paddingHorizontal: 20 },
 
