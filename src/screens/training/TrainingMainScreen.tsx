@@ -8,10 +8,11 @@ import { initTemplates } from '../../storage/trainingStorage';
 import { useTraining } from '../../hooks/useTraining';
 import { TrainingLogScreen } from './TrainingLogScreen';
 import { TrainingStatsScreen } from './TrainingStatsScreen';
+import { PlanningScreen } from './PlanningScreen';
 
 type Props = NativeStackScreenProps<TrainingStackParamList, 'TrainingMain'>;
-type TabKey = 'Log' | 'Statistik';
-const TABS: TabKey[] = ['Log', 'Statistik'];
+type TabKey = 'Log' | 'Planung' | 'Statistik';
+const TABS: TabKey[] = ['Log', 'Planung', 'Statistik'];
 
 export function TrainingMainScreen({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<TabKey>('Log');
@@ -38,6 +39,8 @@ export function TrainingMainScreen({ navigation }: Props) {
           templates={templates}
           onReload={reload}
         />
+      ) : activeTab === 'Planung' ? (
+        <PlanningScreen navigation={navigation as unknown as NativeStackNavigationProp<TrainingStackParamList>} />
       ) : (
         <TrainingStatsScreen sessions={sessions} />
       )}
