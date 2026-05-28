@@ -1,3 +1,4 @@
+import { StackActions } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -100,10 +101,16 @@ export function TimerScreen({ route, navigation }: Props) {
     ]).catch(console.warn);
   }, [timer.phase]);
 
-  // Zurück-Navigation während laufendem Timer abfangen
+  // Zurück-Navigation abfangen
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', e => {
-      if (timer.phase === 'idle' || timer.phase === 'complete') return;
+      if (timer.phase === 'complete') {
+        // Stack sauber aufräumen: Timer aus dem HangboardStack entfernen
+        (e as any).preventDefault();
+        navigation.dispatch(StackActions.popToTop());
+        return;
+      }
+      if (timer.phase === 'idle') return;
       // React Navigation v7: cast nötig da der Typ fälschlicherweise als non-cancelable deklariert ist
       (e as any).preventDefault();
       Alert.alert('Workout abbrechen?', 'Der aktuelle Fortschritt geht verloren.', [
@@ -136,7 +143,7 @@ export function TimerScreen({ route, navigation }: Props) {
           <StatBox label="Dauer"    value={formatDuration(timer.elapsedSeconds)} />
         </View>
         <Text style={styles.savedHint}>Session wurde gespeichert</Text>
-        <TouchableOpacity style={styles.doneBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.doneBtn} onPress={() => navigation.dispatch(StackActions.popToTop())}>
           <Text style={styles.doneBtnText}>Zurück</Text>
         </TouchableOpacity>
       </View>

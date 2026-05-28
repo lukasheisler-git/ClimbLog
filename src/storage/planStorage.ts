@@ -15,7 +15,12 @@ function makeDefaultPlan(): TrainingPlan {
 
 export async function loadPlans(): Promise<TrainingPlan[]> {
   const raw = await AsyncStorage.getItem(PLANS_KEY);
-  return raw ? JSON.parse(raw) : [];
+  if (!raw) return [];
+  const plans: TrainingPlan[] = JSON.parse(raw);
+  return plans.map(p => ({
+    ...p,
+    weekdays: p.weekdays.map(d => ({ ...d, units: d.units ?? [] })),
+  }));
 }
 
 export async function savePlans(plans: TrainingPlan[]): Promise<void> {

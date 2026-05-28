@@ -5,7 +5,9 @@ import {
 import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { CATEGORY_COLOR, TrainingCategory, TrainingSession } from '../../types/training';
 import { StatsRange, calcCategoryCounts, calcStats, filterByRange } from '../../hooks/useTraining';
-import { useTrainingPlan } from '../../hooks/useTrainingPlan';
+import { getWeekDates, useTrainingPlan } from '../../hooks/useTrainingPlan';
+import { loadSessions as loadHangboardSessions } from '../../storage/hangboardStorage';
+import { HangboardSession } from '../../types/hangboard';
 import { WEEKDAY_OFFSET } from '../../types/plan';
 
 interface Props {
@@ -243,39 +245,39 @@ const RANGES: { key: StatsRange; label: string }[] = [
 
 function useWeekCompliance(sessions: TrainingSession[]) {
   const { activePlan, reload } = useTrainingPlan();
+  const [hangSessions, setHangSessions] = useState<HangboardSession[]>([]);
+
   useEffect(() => { reload(); }, [reload]);
+  useEffect(() => { loadHangboardSessions().then(setHangSessions); }, []);
 
   return useMemo(() => {
     if (!activePlan) return null;
 
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const diffToMonday = (dayOfWeek + 6) % 7;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - diffToMonday);
-    monday.setHours(0, 0, 0, 0);
-
-    const sessionDates = new Set(
-      sessions
-        .filter(s => new Date(s.date) >= monday)
-        .map(s => s.date.slice(0, 10))
-    );
-
+    const weekDates = getWeekDates(); // index 0=Mon … 6=Sun
     const plannedDays = activePlan.weekdays.filter(d => !d.isRestDay && d.units.length > 0);
-    const todayOffset = diffToMonday; // days elapsed since Monday (0=Mon, 6=Sun)
+    if (plannedDays.length === 0) return null;
 
-    // Only check days that have already passed (up to and including today)
+    const todayOffset = (new Date().getDay() + 6) % 7; // 0=Mon, 6=Sun
     const dueByToday = plannedDays.filter(d => WEEKDAY_OFFSET[d.weekday] <= todayOffset);
 
     const completedCount = dueByToday.filter(d => {
-      const date = new Date(monday);
-      date.setDate(monday.getDate() + WEEKDAY_OFFSET[d.weekday]);
-      const iso = date.toISOString().slice(0, 10);
-      return sessionDates.has(iso);
+      const dayDate = weekDates[WEEKDAY_OFFSET[d.weekday]];
+
+      // Condition A: a training session on this date whose category matches a planned training unit
+      const plannedTrainingCats = new Set(d.units.filter(u => u.type === 'training').map(u => u.category));
+      const hasTrainingMatch = plannedTrainingCats.size > 0 &&
+        sessions.some(s => s.date.slice(0, 10) === dayDate && plannedTrainingCats.has(s.category));
+
+      // Condition B: a hangboard session on this date AND the day has at least one hangboard unit
+      const hasHangboardUnits = d.units.some(u => u.type === 'hangboard');
+      const hasHangboardMatch = hasHangboardUnits &&
+        hangSessions.some(s => s.date.slice(0, 10) === dayDate);
+
+      return hasTrainingMatch || hasHangboardMatch;
     }).length;
 
     return { completed: completedCount, due: dueByToday.length, total: plannedDays.length };
-  }, [activePlan, sessions]);
+  }, [activePlan, sessions, hangSessions]);
 }
 
 export function TrainingStatsScreen({ sessions }: Props) {

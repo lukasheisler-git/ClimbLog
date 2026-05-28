@@ -1,38 +1,24 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { ClimbRoute } from '../../types/climblog';
+import { getWeekDates } from '../../hooks/useTrainingPlan';
 
 interface Props {
-  routes: ClimbRoute[];
-}
-
-function getWeekDates(): string[] {
-  const today = new Date();
-  const day = today.getDay(); // 0=Sun
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - ((day + 6) % 7));
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return d.toISOString().slice(0, 10);
-  });
+  activeDays: boolean[]; // index 0=Mon … 6=Sun
 }
 
 const DAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 
-export function WeekActivityWidget({ routes }: Props) {
+export function WeekActivityWidget({ activeDays }: Props) {
   const weekDates = getWeekDates();
   const today = new Date().toISOString().slice(0, 10);
-
-  const activeDays = new Set(routes.map(r => r.date.slice(0, 10)));
 
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Diese Woche</Text>
       <View style={styles.dots}>
         {weekDates.map((date, i) => {
-          const isActive  = activeDays.has(date);
-          const isToday   = date === today;
+          const isActive = activeDays[i] ?? false;
+          const isToday  = date === today;
           return (
             <View key={date} style={styles.dayCol}>
               <View style={[

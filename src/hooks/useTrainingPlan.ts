@@ -6,6 +6,19 @@ export function getTodayWeekday(): Weekday {
   return JS_DAY_TO_WEEKDAY[new Date().getDay()];
 }
 
+/** Returns ISO date strings for Mon–Sun of the current week (index 0=Mon, 6=Sun). */
+export function getWeekDates(): string[] {
+  const today = new Date();
+  const diff = (today.getDay() + 6) % 7;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - diff);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d.toISOString().slice(0, 10);
+  });
+}
+
 export function useTrainingPlan() {
   const [plans, setPlans] = useState<TrainingPlan[]>([]);
 
