@@ -1,15 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TrainingStackParamList } from '../../navigation/types';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert, FlatList, Modal, ScrollView, StyleSheet,
   Text, TouchableOpacity, View,
 } from 'react-native';
 import { CategoryBadge } from '../../components/training/CategoryBadge';
 import { SessionCard } from '../../components/training/SessionCard';
+import { useTrainingPlan } from '../../hooks/useTrainingPlan';
 import { deleteSession } from '../../storage/trainingStorage';
-import { TrainingSession } from '../../types/training';
+import { PlannedUnit } from '../../types/plan';
+import { CATEGORY_COLOR, TrainingSession } from '../../types/training';
+
+function badgeColor(category: string): string {
+  return (CATEGORY_COLOR as Record<string, string>)[category] ?? '#6B7280';
+}
 
 interface Props {
   navigation: NativeStackNavigationProp<TrainingStackParamList>;
@@ -24,6 +30,8 @@ function formatDate(iso: string): string {
 
 export function TrainingLogScreen({ navigation, sessions, templates, onReload }: Props) {
   const [modalVisible, setModalVisible] = useState(false);
+  const { todayPlan, reload } = useTrainingPlan();
+  useEffect(() => { reload(); }, [reload]);
 
   const openFromTemplate = async (template: TrainingSession) => {
     setModalVisible(false);
@@ -45,6 +53,18 @@ export function TrainingLogScreen({ navigation, sessions, templates, onReload }:
     setModalVisible(false);
     navigation.navigate('SessionEditor', {});
   };
+
+  const openPlannedUnit = (unit: PlannedUnit) => {
+    setModalVisible(false);
+    if (unit.type === 'hangboard') {
+      (navigation as any).navigate('HangboardTab', { screen: 'HangboardHome' });
+      (navigation as any).navigate('HangboardTab', { screen: 'Timer', params: { workoutId: unit.templateId } });
+    } else {
+      navigation.navigate('SessionEditor', { templateId: unit.templateId });
+    }
+  };
+
+  const showTodaySection = !!(todayPlan && !todayPlan.isRestDay && todayPlan.units.length > 0);
 
   return (
     <View style={styles.root}>
@@ -79,6 +99,31 @@ export function TrainingLogScreen({ navigation, sessions, templates, onReload }:
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
           <Text style={styles.modalTitle}>Training starten</Text>
+
+          {showTodaySection && (
+            <View style={styles.todaySection}>
+              <View style={styles.modalSectionRow}>
+                <Ionicons name="calendar-outline" size={12} color="#6B7280" />
+                <Text style={styles.modalSection}>Heute geplant</Text>
+              </View>
+              {todayPlan!.units.map(unit => {
+                const color = badgeColor(unit.category);
+                return (
+                  <TouchableOpacity key={unit.id} style={styles.plannedUnitCard} onPress={() => openPlannedUnit(unit)}>
+                    <Ionicons
+                      name={unit.type === 'hangboard' ? 'finger-print-outline' : 'barbell-outline'}
+                      size={17} color="#6B7280"
+                    />
+                    <Text style={styles.plannedUnitName} numberOfLines={1}>{unit.templateName}</Text>
+                    <View style={[styles.unitBadge, { backgroundColor: color + '22' }]}>
+                      <Text style={[styles.unitBadgeText, { color }]}>{unit.category}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward-outline" size={14} color="#D1D5DB" />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
           <Text style={styles.modalSection}>Schnellstart</Text>
           <ScrollView
@@ -150,5 +195,12 @@ const styles = StyleSheet.create({
 
   customBtn:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderColor: '#1B4332', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 13 },
   customBtnText: { fontSize: 15, fontWeight: '600', color: '#1B4332' },
+
+  modalSectionRow:  { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 10 },
+  todaySection:     { marginBottom: 20 },
+  plannedUnitCard:  { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F9FAFB', borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1.5, borderColor: '#E5E7EB' },
+  plannedUnitName:  { flex: 1, fontSize: 13, fontWeight: '600', color: '#111827' },
+  unitBadge:        { borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
+  unitBadgeText:    { fontSize: 10, fontWeight: '600' },
 });
 

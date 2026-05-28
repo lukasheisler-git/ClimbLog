@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { NavigationProp } from '@react-navigation/native';
-import React, { useEffect } from 'react';
+import { NavigationProp, useFocusEffect } from '@react-navigation/native';
+import React, { useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTrainingPlan } from '../../hooks/useTrainingPlan';
 import { AppTabParamList } from '../../navigation/types';
@@ -40,10 +40,11 @@ function UnitRow({ unit, onPress }: { unit: PlannedUnit; onPress: () => void }) 
 export function TodayWidget({ navigation }: Props) {
   const { todayPlan, activePlan, reload } = useTrainingPlan();
 
-  useEffect(() => { reload(); }, [reload]);
+  useFocusEffect(useCallback(() => { reload(); }, [reload]));
 
   const handleUnitPress = (unit: PlannedUnit) => {
     if (unit.type === 'hangboard') {
+      navigation.navigate('HangboardTab', { screen: 'HangboardHome' } as any);
       navigation.navigate('HangboardTab', { screen: 'Timer', params: { workoutId: unit.templateId } } as any);
     } else {
       navigation.navigate('TrainingTab', { screen: 'SessionEditor', params: { templateId: unit.templateId } } as any);

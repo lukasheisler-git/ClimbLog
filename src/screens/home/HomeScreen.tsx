@@ -13,6 +13,9 @@ import { WeekActivityWidget } from '../../components/home/WeekActivityWidget';
 import { WeightWidget } from '../../components/home/WeightWidget';
 import { loadBucketList, loadSettings, loadWeightEntries, saveSettings } from '../../storage/homeStorage';
 import { loadRoutes } from '../../storage/climblogStorage';
+import { loadSessions as loadHangboardSessions } from '../../storage/hangboardStorage';
+import { loadSessions as loadTrainingSessions } from '../../storage/trainingStorage';
+import { getWeekDates } from '../../hooks/useTrainingPlan';
 import { ClimbRoute } from '../../types/climblog';
 import { AppSettings, BucketListItem, WeightEntry } from '../../types/home';
 import { AppTabParamList } from '../../navigation/types';
@@ -28,16 +31,26 @@ export function HomeScreen({ navigation }: Props) {
   const [weights,         setWeights]         = useState<WeightEntry[]>([]);
   const [bucketItems,     setBucketItems]     = useState<BucketListItem[]>([]);
   const [settings,        setSettings]        = useState<AppSettings>({ showWeight: true });
+  const [activeDays,      setActiveDays]      = useState<boolean[]>(Array(7).fill(false));
   const [settingsVisible, setSettingsVisible] = useState(false);
 
   const loadAll = useCallback(async () => {
-    const [r, w, b, s] = await Promise.all([
+    const [r, w, b, s, trainings, hangboardSessions] = await Promise.all([
       loadRoutes(), loadWeightEntries(), loadBucketList(), loadSettings(),
+      loadTrainingSessions(), loadHangboardSessions(),
     ]);
     setRoutes(r);
     setWeights(w);
     setBucketItems(b);
     setSettings(s);
+
+    const weekDates = getWeekDates();
+    const activeDateSet = new Set([
+      ...r.map(route => route.date.slice(0, 10)),
+      ...trainings.map(t => t.date.slice(0, 10)),
+      ...hangboardSessions.map(h => h.date.slice(0, 10)),
+    ]);
+    setActiveDays(weekDates.map(date => activeDateSet.has(date)));
   }, []);
 
   useFocusEffect(useCallback(() => { loadAll(); }, [loadAll]));
@@ -47,14 +60,6 @@ export function HomeScreen({ navigation }: Props) {
     setSettings(next);
     await saveSettings(next);
   };
-
-  const weekRoutes = (() => {
-    const today = new Date();
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
-    monday.setHours(0, 0, 0, 0);
-    return routes.filter(r => new Date(r.date) >= monday);
-  })();
 
   const openProjects = routes
     .filter(r => r.result === 'Project')
@@ -73,7 +78,7 @@ export function HomeScreen({ navigation }: Props) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <WeekActivityWidget routes={weekRoutes} />
+        <WeekActivityWidget activeDays={activeDays} />
 
         {settings.showWeight && <WeightWidget entries={weights} onUpdate={loadAll} />}
 

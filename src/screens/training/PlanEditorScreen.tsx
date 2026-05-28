@@ -32,23 +32,27 @@ export function PlanEditorScreen({ route, navigation }: Props) {
       return;
     }
 
-    const plans = await loadPlans();
+    try {
+      const plans = await loadPlans();
 
-    if (planId) {
-      await savePlans(plans.map(p => p.id === planId ? { ...p, name: trimmed } : p));
-    } else {
-      const hasActive = plans.some(p => p.isActive);
-      const newPlan: TrainingPlan = {
-        id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        name: trimmed,
-        createdAt: new Date().toISOString(),
-        isActive: !hasActive,
-        weekdays: ALL_WEEKDAYS.map(weekday => ({ weekday, isRestDay: true, units: [] })),
-      };
-      await savePlans([...plans, newPlan]);
+      if (planId) {
+        await savePlans(plans.map(p => p.id === planId ? { ...p, name: trimmed } : p));
+      } else {
+        const hasActive = plans.some(p => p.isActive);
+        const newPlan: TrainingPlan = {
+          id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          name: trimmed,
+          createdAt: new Date().toISOString(),
+          isActive: !hasActive,
+          weekdays: ALL_WEEKDAYS.map(weekday => ({ weekday, isRestDay: true, units: [] })),
+        };
+        await savePlans([...plans, newPlan]);
+      }
+
+      navigation.goBack();
+    } catch {
+      Alert.alert('Fehler', 'Plan konnte nicht gespeichert werden.');
     }
-
-    navigation.goBack();
   };
 
   return (

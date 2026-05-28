@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert, FlatList, Modal, ScrollView, StyleSheet,
   Text, TouchableOpacity, View,
 } from 'react-native';
 import { TrainingStackParamList } from '../../navigation/types';
 import { CATEGORY_COLOR } from '../../types/training';
-import { ALL_WEEKDAYS, PlannedUnit, TrainingPlan, Weekday, WEEKDAY_LABEL } from '../../types/plan';
+import { ALL_WEEKDAYS, PlannedUnit, TrainingPlan, Weekday, WeekdayPlan, WEEKDAY_LABEL } from '../../types/plan';
 import { useTrainingPlan, getTodayWeekday } from '../../hooks/useTrainingPlan';
 
 interface Props {
@@ -41,9 +42,7 @@ function UnitChip({ unit }: { unit: PlannedUnit }) {
 
 // ─── Day Card ────────────────────────────────────────────────────────────────
 
-function DayCard({ weekday, isToday, onEdit }: { weekday: Weekday; plan: TrainingPlan | null; isToday: boolean; onEdit: () => void }) {
-  const { activePlan } = useTrainingPlan();
-  const day = activePlan?.weekdays.find(d => d.weekday === weekday);
+function DayCard({ weekday, day, isToday, onEdit }: { weekday: Weekday; day: WeekdayPlan | undefined; isToday: boolean; onEdit: () => void }) {
   const isRestDay = day?.isRestDay ?? true;
   const units = day?.units ?? [];
 
@@ -136,6 +135,7 @@ export function PlanningScreen({ navigation }: Props) {
   const todayWeekday = getTodayWeekday();
 
   useEffect(() => { reload(); }, [reload]);
+  useFocusEffect(useCallback(() => { reload(); }, [reload]));
 
   const handleDeletePlan = (id: string) => {
     Alert.alert('Plan löschen?', 'Dieser Plan wird dauerhaft gelöscht.', [
@@ -163,7 +163,7 @@ export function PlanningScreen({ navigation }: Props) {
           <DayCard
             key={weekday}
             weekday={weekday}
-            plan={activePlan}
+            day={activePlan?.weekdays.find(d => d.weekday === weekday)}
             isToday={weekday === todayWeekday}
             onEdit={() => navigation.navigate('DayEditor', { weekday })}
           />
