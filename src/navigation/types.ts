@@ -1,4 +1,5 @@
 import { NavigatorScreenParams } from '@react-navigation/native';
+import { Weekday } from '../types/plan';
 
 export type HangboardStackParamList = {
   HangboardHome: undefined;
@@ -18,6 +19,8 @@ export type TrainingStackParamList = {
   TrainingMain:   undefined;
   SessionEditor:  { sessionId?: string; templateId?: string };
   SessionDetail:  { sessionId: string };
+  DayEditor:      { weekday: Weekday };
+  PlanEditor:     { planId?: string };
 };
 
 export type AppTabParamList = {

@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { BucketListWidget } from '../../components/home/BucketListWidget';
 import { ProjectsWidget } from '../../components/home/ProjectsWidget';
+import { TodayWidget } from '../../components/home/TodayWidget';
 import { WeekActivityWidget } from '../../components/home/WeekActivityWidget';
 import { WeightWidget } from '../../components/home/WeightWidget';
 import { loadBucketList, loadSettings, loadWeightEntries, saveSettings } from '../../storage/homeStorage';
@@ -83,11 +84,7 @@ export function HomeScreen({ navigation }: Props) {
 
         <BucketListWidget items={bucketItems} onUpdate={loadAll} />
 
-        {/* Nächstes Training — Platzhalter */}
-        <View style={styles.nextCard}>
-          <Text style={styles.nextTitle}>Nächstes Training</Text>
-          <Text style={styles.nextPlaceholder}>Trainingsplanung kommt bald.</Text>
-        </View>
+        <TodayWidget navigation={navigation} />
       </ScrollView>
 
       {/* Settings Modal */}
@@ -129,10 +126,6 @@ const styles = StyleSheet.create({
   date:    { fontSize: 13, color: '#9CA3AF', marginTop: 2 },
 
   content: { paddingHorizontal: 16, paddingBottom: 48 },
-
-  nextCard:        { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 4, elevation: 2 },
-  nextTitle:       { fontSize: 13, fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
-  nextPlaceholder: { fontSize: 13, color: '#9CA3AF', paddingVertical: 8 },
 
   settingsRoot:    { flex: 1, backgroundColor: '#F3F4F6' },
   settingsHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 52, paddingBottom: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },

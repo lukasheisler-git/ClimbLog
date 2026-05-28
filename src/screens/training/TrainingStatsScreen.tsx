@@ -1,10 +1,12 @@
-import React, { useRef, useMemo, useState } from 'react';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
 import {
   Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { CATEGORY_COLOR, TrainingCategory, TrainingSession } from '../../types/training';
 import { StatsRange, calcCategoryCounts, calcStats, filterByRange } from '../../hooks/useTraining';
+import { useTrainingPlan } from '../../hooks/useTrainingPlan';
+import { WEEKDAY_OFFSET } from '../../types/plan';
 
 interface Props {
   sessions: TrainingSession[];
@@ -239,11 +241,49 @@ const RANGES: { key: StatsRange; label: string }[] = [
   { key: 'all', label: 'Gesamt' },
 ];
 
+function useWeekCompliance(sessions: TrainingSession[]) {
+  const { activePlan, reload } = useTrainingPlan();
+  useEffect(() => { reload(); }, [reload]);
+
+  return useMemo(() => {
+    if (!activePlan) return null;
+
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const diffToMonday = (dayOfWeek + 6) % 7;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+
+    const sessionDates = new Set(
+      sessions
+        .filter(s => new Date(s.date) >= monday)
+        .map(s => s.date.slice(0, 10))
+    );
+
+    const plannedDays = activePlan.weekdays.filter(d => !d.isRestDay && d.units.length > 0);
+    const todayOffset = diffToMonday; // days elapsed since Monday (0=Mon, 6=Sun)
+
+    // Only check days that have already passed (up to and including today)
+    const dueByToday = plannedDays.filter(d => WEEKDAY_OFFSET[d.weekday] <= todayOffset);
+
+    const completedCount = dueByToday.filter(d => {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + WEEKDAY_OFFSET[d.weekday]);
+      const iso = date.toISOString().slice(0, 10);
+      return sessionDates.has(iso);
+    }).length;
+
+    return { completed: completedCount, due: dueByToday.length, total: plannedDays.length };
+  }, [activePlan, sessions]);
+}
+
 export function TrainingStatsScreen({ sessions }: Props) {
   const [range, setRange] = useState<StatsRange>('4w');
 
   const stats      = useMemo(() => calcStats(sessions), [sessions]);
   const filtered   = useMemo(() => filterByRange(sessions, range), [sessions, range]);
+  const compliance = useWeekCompliance(sessions);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -256,6 +296,32 @@ export function TrainingStatsScreen({ sessions }: Props) {
         <StatCard label="Gesamtstunden"    value={stats.totalHours.toFixed(1) + ' h'} />
         <StatCard label="letzte 4 Wochen"  value={`${stats.activeDays28} / 28`} />
       </View>
+
+      {/* Woche eingehalten */}
+      {compliance !== null && (
+        <>
+          <Text style={styles.sectionTitle}>Woche eingehalten</Text>
+          <View style={[styles.card, styles.complianceCard]}>
+            <View style={styles.complianceNumbers}>
+              <Text style={styles.complianceBig}>{compliance.completed}</Text>
+              <Text style={styles.complianceSep}>/</Text>
+              <Text style={styles.complianceDue}>{compliance.due}</Text>
+            </View>
+            <View style={styles.complianceRight}>
+              <Text style={styles.complianceLabel}>
+                {compliance.completed === compliance.due && compliance.due > 0
+                  ? 'Alle Einheiten erledigt'
+                  : `von ${compliance.due} geplanten Tagen trainiert`}
+              </Text>
+              {compliance.total > compliance.due && (
+                <Text style={styles.complianceSub}>
+                  {compliance.total - compliance.due} weitere diese Woche geplant
+                </Text>
+              )}
+            </View>
+          </View>
+        </>
+      )}
 
       {/* Donut */}
       <View style={styles.sectionHeader}>
@@ -326,4 +392,13 @@ const styles = StyleSheet.create({
   heatLegend:      { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10, justifyContent: 'flex-end' },
   heatLegendLabel: { fontSize: 10, color: '#9CA3AF' },
   heatLegendCell:  { width: 10, height: 10, borderRadius: 2 },
+
+  complianceCard:    { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 24 },
+  complianceNumbers: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  complianceBig:     { fontSize: 36, fontWeight: '700', color: '#111827' },
+  complianceSep:     { fontSize: 20, color: '#9CA3AF' },
+  complianceDue:     { fontSize: 24, fontWeight: '600', color: '#9CA3AF' },
+  complianceRight:   { flex: 1, gap: 2 },
+  complianceLabel:   { fontSize: 13, fontWeight: '600', color: '#374151' },
+  complianceSub:     { fontSize: 11, color: '#9CA3AF' },
 });
